@@ -57,7 +57,7 @@ pub struct LocalServerConfigOutput {
 impl LocalServerConfigOutput {
     pub fn new_with_defaults() -> Self {
         Self {
-            listen_address: "127.0.0.1:8090".to_string(),
+            listen_address: "0.0.0.0:8090".to_string(), // MODIFIED HERE
             encryption_key_hex: String::new(),
             database_path: "activity_database.sqlite".to_string(),
             log_retention_days: 30,

@@ -122,6 +122,13 @@ impl App for GeneratorAppState {
                         ui.add(egui::DragValue::new(&mut self.client_config.sync_interval)
                             .speed(10.0).clamp_range(10..=86400).suffix(" s"));
                         ui.end_row();
+
+                        // New field for processor_periodic_flush_interval_secs
+                        ui.label("Periodic Session Flush (sec):")
+                            .on_hover_text("Interval to flush current app activity if no app switch occurs. 0 to disable periodic flush.");
+                        ui.add(egui::DragValue::new(&mut self.client_config.processor_periodic_flush_interval_secs)
+                            .speed(10.0).clamp_range(0..=7200u64).suffix(" s")); // 0 to disable, up to 2 hours
+                        ui.end_row();
                         
                         ui.label("Max Client Log File Size (MB):")
                             .on_hover_text("Max size for client's local cache (activity_data.jsonl). 0 for no limit (not recommended).");
