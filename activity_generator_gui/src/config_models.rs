@@ -31,15 +31,15 @@ impl ClientSettingsOutput {
             sync_interval: 60,
             processor_periodic_flush_interval_secs: 120,
             internal_log_level: "info".to_string(),
-            log_file_path: "activity_data.log.bin".to_string(),
+            log_file_path: "activity_data.jsonl".to_string(), // MODIFIED HERE from .log.bin
             app_name_for_autorun: "SystemActivityAgent".to_string(),
             local_log_cache_retention_days: 7,
             retry_interval_on_fail: 60,
-            max_retries_per_batch: 3, // Corrected to u32
+            max_retries_per_batch: 3,
             max_log_file_size_mb: Some(20),
-            max_events_per_sync_batch: 200, // Corrected to usize
+            max_events_per_sync_batch: 200,
             internal_log_file_dir: "client_logs".to_string(),
-            internal_log_file_name: "monitor_client_diag.log".to_string(), // Corrected with .to_string()
+            internal_log_file_name: "monitor_client_diag.log".to_string(),
             client_id_file: None,
         }
     }

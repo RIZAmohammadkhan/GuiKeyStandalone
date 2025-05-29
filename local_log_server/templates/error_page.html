@@ -4,7 +4,9 @@
 {% block header_title %}An Error Occurred{% endblock %}
 
 {% block content %}
-    <h2>{{ error_title }}</h2>
-    <p class="error">{{ error_message }}</p>
-    <p><a href="/logs">Return to logs</a></p>
+    <div class="error-page">
+        <h2>{{ error_title }}</h2>
+        <p class="error-message">{{ error_message }}</p>
+        <p><a href="/logs">Return to logs</a></p>
+    </div>
 {% endblock %}

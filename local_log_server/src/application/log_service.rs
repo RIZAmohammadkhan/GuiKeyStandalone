@@ -1,26 +1,29 @@
-// src/application/log_service.rs
-
 use crate::app_config::ServerSettings;
 use crate::domain::event_types::LogEvent;
 use crate::errors::ServerError;
 use crate::infrastructure::{
     database::DbConnection,
-    encryption::decrypt_payload, // Assuming decrypt_payload is pub in infrastructure::encryption
+    encryption::decrypt_payload,
 };
+use actix_web::web; // For web::block
 use std::sync::Arc;
 use tokio::time::{interval, Duration, MissedTickBehavior};
-use uuid::Uuid; // For client_id if needed in future filtering
 
-#[derive(Clone)] // LogService needs to be Clone to be used as Actix web::Data
+#[derive(Clone)]
 pub struct LogService {
     db_conn: DbConnection,
-    encryption_key: [u8; 32], // Store the key for decryption
-    settings: Arc<ServerSettings>, // For retention policy, etc.
+    encryption_key: [u8; 32],
+    settings: Arc<ServerSettings>,
+}
+
+// Helper to map BlockingError to ServerError
+fn map_blocking_error(e: actix_web::error::BlockingError) -> ServerError {
+    ServerError::Internal(format!("Blocking task panicked or was cancelled: {}", e))
 }
 
 impl LogService {
     pub fn new(db_conn: DbConnection, settings: Arc<ServerSettings>) -> Self {
-        let key = settings.encryption_key; // Copy the key array
+        let key = settings.encryption_key;
         LogService {
             db_conn,
             encryption_key: key,
@@ -28,11 +31,9 @@ impl LogService {
         }
     }
 
-    /// Ingests a batch of encrypted log data.
-    /// It decrypts, deserializes, and stores the log events.
     pub async fn ingest_log_batch(
         &self,
-        client_id_str: &str, // Client ID from header, for logging/potential future use
+        client_id_str: &str,
         encrypted_data: Vec<u8>,
     ) -> Result<usize, ServerError> {
         tracing::debug!(
@@ -41,23 +42,29 @@ impl LogService {
             client_id_str
         );
 
-        // 1. Decrypt payload
-        let decrypted_json_bytes = decrypt_payload(&encrypted_data, &self.encryption_key)?;
+        let key_clone = self.encryption_key;
+        // Closure for decrypt_payload returns Result<Vec<u8>, ServerError>
+        // web::block(...).await -> Result<Result<Vec<u8>, ServerError>, BlockingError>
+        // .map_err(map_blocking_error) -> Result<Result<Vec<u8>, ServerError>, ServerError>
+        // outer ? -> Result<Vec<u8>, ServerError>
+        // inner ? -> Vec<u8>
+        let decrypted_json_bytes = web::block(move || decrypt_payload(&encrypted_data, &key_clone))
+            .await
+            .map_err(map_blocking_error)??; // This is correct if we want Vec<u8> here.
+        
         tracing::trace!("LogService: Successfully decrypted payload.");
 
-        // 2. Deserialize JSON into Vec<LogEvent>
-        // The client sends a JSON array of LogEvent objects.
         let log_events: Vec<LogEvent> = serde_json::from_slice(&decrypted_json_bytes)
             .map_err(|e| {
-                tracing::error!("LogService: Failed to deserialize log events JSON: {}. Data (first 200B): {:?}", 
-                    e, 
+                tracing::error!("LogService: Failed to deserialize log events JSON: {}. Data (first 200B): {:?}",
+                    e,
                     String::from_utf8_lossy(
                         &decrypted_json_bytes[..std::cmp::min(200, decrypted_json_bytes.len())]
                     )
                 );
                 ServerError::Json(e)
             })?;
-        
+
         let num_events = log_events.len();
         tracing::debug!("LogService: Deserialized {} log events from client_id: {}.", num_events, client_id_str);
 
@@ -66,37 +73,62 @@ impl LogService {
             return Ok(0);
         }
 
-        // 3. Store in database
-        // This can be a blocking operation, so consider spawn_blocking if it becomes a bottleneck.
-        // For SQLite with a Mutex-guarded connection, direct call might be okay for now.
-        self.db_conn.insert_log_events(log_events)?;
-        tracing::info!("LogService: Successfully stored {} log events from client_id: {}.", num_events, client_id_str);
+        let db_conn_clone = self.db_conn.clone();
+        // Closure for insert_log_events returns Result<(), ServerError>
+        // web::block(...).await.map_err(...)?? -> unwraps fully to () on success, or propagates ServerError. Correct.
+        web::block(move || db_conn_clone.insert_log_events(log_events))
+            .await
+            .map_err(map_blocking_error)??;
 
+        tracing::info!("LogService: Successfully stored {} log events from client_id: {}.", num_events, client_id_str);
         Ok(num_events)
     }
 
-    /// Retrieves a paginated list of log events.
     pub async fn get_log_events_paginated(
         &self,
         page: u32,
         page_size: u32,
     ) -> Result<Vec<LogEvent>, ServerError> {
         tracing::debug!("LogService: Querying log events - page: {}, page_size: {}", page, page_size);
-        // Again, potential spawn_blocking if DB queries are slow, though SQLite reads are often fast.
-        self.db_conn.query_log_events(page, page_size)
+        let db_conn_clone = self.db_conn.clone();
+        // Closure returns Result<Vec<LogEvent>, ServerError>
+        // web::block(...).await.map_err(...) -> Result<Result<Vec<LogEvent>, ServerError>, ServerError>
+        // ? on this -> Result<Vec<LogEvent>, ServerError>. This matches function signature.
+        web::block(move || db_conn_clone.query_log_events(page, page_size))
+            .await
+            .map_err(map_blocking_error)? // Single ? here
     }
 
-    /// Gets the total count of log events.
     pub async fn get_total_log_count(&self) -> Result<i64, ServerError> {
         tracing::debug!("LogService: Querying total log event count.");
-        self.db_conn.count_total_log_events()
+        let db_conn_clone = self.db_conn.clone();
+        // Closure returns Result<i64, ServerError>
+        // web::block(...).await.map_err(...) -> Result<Result<i64, ServerError>, ServerError>
+        // ? on this -> Result<i64, ServerError>. This matches function signature.
+        web::block(move || db_conn_clone.count_total_log_events())
+            .await
+            .map_err(map_blocking_error)? // Single ? here
     }
-    
-    /// Deletes old logs based on the retention policy.
-    /// This method is intended to be called periodically.
-    async fn delete_old_logs_task(&self) -> Result<usize, ServerError> {
+
+    // This is an internal helper, but let's make it consistent.
+    // It's called by the spawned task which handles the Result.
+    async fn delete_old_logs_from_db(&self) -> Result<usize, ServerError> {
+        let db_conn_clone = self.db_conn.clone();
+        let settings_clone = Arc::clone(&self.settings);
+        // Closure returns Result<usize, ServerError>
+        // web::block(...).await.map_err(...) -> Result<Result<usize, ServerError>, ServerError>
+        // ? on this -> Result<usize, ServerError>.
+        web::block(move || db_conn_clone.delete_old_logs(&settings_clone))
+            .await
+            .map_err(map_blocking_error)? // Single ? here
+    }
+
+    // This public method is for the spawned task, which will handle the Result.
+    pub async fn run_scheduled_log_deletion(&self) -> Result<usize, ServerError> {
         tracing::info!("LogService: Starting scheduled task to delete old logs.");
-        let deleted_count = self.db_conn.delete_old_logs(&self.settings)?;
+        // Call the internal helper that returns Result<usize, ServerError>
+        let deleted_count = self.delete_old_logs_from_db().await?;
+
         if deleted_count > 0 {
             tracing::info!("LogService: Scheduled deletion removed {} old log entries.", deleted_count);
         } else {
@@ -106,17 +138,15 @@ impl LogService {
     }
 }
 
-/// Spawns a Tokio task that periodically runs the log deletion process.
 pub fn spawn_periodic_log_deletion_task(log_service: LogService) {
     if log_service.settings.log_retention_days == 0 {
         tracing::info!("LogService: Periodic log deletion is disabled (retention_days = 0).");
         return;
     }
 
-    // Run deletion check, e.g., every 6 or 24 hours. Make this configurable if needed.
-    let deletion_check_interval_hours = 24u64; 
+    let deletion_check_interval_hours = log_service.settings.log_deletion_check_interval_hours;
     let mut interval = interval(Duration::from_secs(deletion_check_interval_hours * 60 * 60));
-    interval.set_missed_tick_behavior(MissedTickBehavior::Delay); // If server was off, run when it starts
+    interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
     tokio::spawn(async move {
         tracing::info!(
@@ -126,8 +156,15 @@ pub fn spawn_periodic_log_deletion_task(log_service: LogService) {
         loop {
             interval.tick().await;
             tracing::info!("LogService: Triggering periodic deletion of old logs...");
-            if let Err(e) = log_service.delete_old_logs_task().await {
-                tracing::error!("LogService: Error during periodic log deletion: {}", e);
+            // run_scheduled_log_deletion now returns Result<usize, ServerError>
+            match log_service.run_scheduled_log_deletion().await {
+                Ok(count) => {
+                    // This trace is fine, count is known.
+                    tracing::debug!("LogService: Periodic deletion task completed, {} entries affected.", count);
+                }
+                Err(e) => {
+                    tracing::error!("LogService: Error during periodic log deletion: {}", e);
+                }
             }
         }
     });

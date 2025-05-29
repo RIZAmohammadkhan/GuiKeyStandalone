@@ -1,4 +1,4 @@
-// ... (other imports and structs are the same) ...
+// src/core_monitors/clipboard_capture.rs
 use crate::app_config::Settings;
 use crate::errors::{AppError, win_api_error};
 use crate::core_monitors::foreground_app::get_current_foreground_app_info_sync;
@@ -6,7 +6,10 @@ use std::ptr::{null, null_mut};
 use std::sync::{mpsc as std_mpsc, Arc};
 use std::thread;
 
-use windows_sys::Win32::Foundation::{GetLastError, LPARAM, LRESULT, WPARAM, HWND, FALSE, HMODULE, HGLOBAL};
+use windows_sys::Win32::Foundation::{
+    GetLastError, LPARAM, LRESULT, WPARAM, HWND, FALSE, HMODULE, HGLOBAL,
+    ERROR_CLASS_ALREADY_EXISTS, ERROR_CLASS_DOES_NOT_EXIST, // Using these from windows_sys
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     WNDCLASSW, CreateWindowExW, DefWindowProcW, DestroyWindow, GetMessageW, HMENU,
     DispatchMessageW, PeekMessageW, PostQuitMessage, RegisterClassW, UnregisterClassW,
@@ -20,7 +23,6 @@ use windows_sys::Win32::System::DataExchange::{
     AddClipboardFormatListener, RemoveClipboardFormatListener,
 };
 use windows_sys::Win32::System::Ole::CF_UNICODETEXT;
-
 
 const CLIPBOARD_LISTENER_CLASS_NAME_WSTR: &[u16] = &[
     0x0043, 0x006C, 0x0069, 0x0070, 0x0062, 0x006F, 0x0061, 0x0072, 0x0064,
@@ -44,6 +46,10 @@ struct ClipboardWindowResources {
     h_instance: HMODULE,
     class_name_ptr: *const u16,
 }
+
+const LOCAL_ERROR_CANNOT_UNREGISTER_ONLINE_CLASS: u32 = 1431;
+
+
 impl Drop for ClipboardWindowResources {
     fn drop(&mut self) {
         unsafe {
@@ -54,7 +60,7 @@ impl Drop for ClipboardWindowResources {
             }
             if UnregisterClassW(self.class_name_ptr, self.h_instance) == FALSE {
                 let err = GetLastError();
-                if err != ERROR_CLASS_DOES_NOT_EXIST && err != ERROR_CANNOT_UNREGISTER_ONLINE_CLASS {
+                if err != ERROR_CLASS_DOES_NOT_EXIST && err != LOCAL_ERROR_CANNOT_UNREGISTER_ONLINE_CLASS {
                     eprintln!("[ERROR] Failed to unregister clipboard listener window class (Error: {}): {}", err, win_api_error("UnregisterClassW (clipboard)").to_string());
                 }
             } else {
@@ -63,7 +69,6 @@ impl Drop for ClipboardWindowResources {
         }
     }
 }
-
 
 pub fn start_clipboard_monitoring(
     event_tx: std_mpsc::Sender<RawClipboardData>,
@@ -129,7 +134,6 @@ pub fn start_clipboard_monitoring(
             println!("[INFO] AddClipboardFormatListener succeeded.");
 
             let mut msg: MSG = std::mem::zeroed();
-            PeekMessageW(&mut msg, hwnd, 0, 0, PM_NOREMOVE);
             while GetMessageW(&mut msg, hwnd, 0, 0) > 0 {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
@@ -149,6 +153,7 @@ unsafe extern "system" fn clipboard_window_proc(
     match msg {
         WM_CLIPBOARDUPDATE => {
             if OpenClipboard(hwnd) != FALSE {
+                // CORRECTED: Cast CF_UNICODETEXT to u32
                 let h_data_handle = GetClipboardData(CF_UNICODETEXT as u32);
                 if h_data_handle != 0 {
                     let h_global_data = h_data_handle as HGLOBAL;
@@ -158,14 +163,12 @@ unsafe extern "system" fn clipboard_window_proc(
                         let data_size_bytes = GlobalSize(h_global_data);
                         let mut len = 0;
                         if data_size_bytes > 0 {
-                            let max_chars = data_size_bytes / std::mem::size_of::<u16>();
+                            let max_chars = (data_size_bytes / std::mem::size_of::<u16>()) as usize;
+                            len = max_chars;
                             for i in 0..max_chars {
                                 if *p_data.add(i) == 0 {
                                     len = i;
                                     break;
-                                }
-                                if i == max_chars -1 && *p_data.add(i) != 0 {
-                                    len = max_chars;
                                 }
                             }
                         }
@@ -174,13 +177,11 @@ unsafe extern "system" fn clipboard_window_proc(
                             let slice = std::slice::from_raw_parts(p_data, len);
                             let text_content = String::from_utf16_lossy(slice);
 
-                            // Use core::ptr::addr_of! to get a raw pointer to the static mut
                             let sender_option_ptr: *const Option<std_mpsc::Sender<RawClipboardData>> =
                                 core::ptr::addr_of!(EVENT_SENDER_CLIPBOARD);
-                            
-                            // Since this entire function is unsafe, dereferencing the raw pointer is allowed.
+
                             if let Some(ref sender_in_option) = *sender_option_ptr {
-                                let sender_clone = sender_in_option.clone(); // Clone the Sender
+                                let sender_clone = sender_in_option.clone();
                                 let app_info = get_current_foreground_app_info_sync();
                                 let raw_event = RawClipboardData {
                                     text_content,
@@ -207,7 +208,3 @@ unsafe extern "system" fn clipboard_window_proc(
         _ => DefWindowProcW(hwnd, msg, w_param, l_param),
     }
 }
-
-const ERROR_CLASS_ALREADY_EXISTS: u32 = 1410;
-const ERROR_CLASS_DOES_NOT_EXIST: u32 = 1411;
-const ERROR_CANNOT_UNREGISTER_ONLINE_CLASS: u32 = 1431;

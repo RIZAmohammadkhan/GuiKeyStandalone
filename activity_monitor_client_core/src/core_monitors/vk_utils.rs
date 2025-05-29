@@ -22,7 +22,6 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     VK_MEDIA_NEXT_TRACK, VK_MEDIA_PREV_TRACK, VK_MEDIA_STOP, VK_MEDIA_PLAY_PAUSE,
     VK_LAUNCH_MAIL, VK_LAUNCH_MEDIA_SELECT, VK_LAUNCH_APP1, VK_LAUNCH_APP2,
 };
-// If LLKHF_UP is indeed in WindowsAndMessaging for your setup:
 // use windows_sys::Win32::UI::WindowsAndMessaging::LLKHF_UP;
 
 

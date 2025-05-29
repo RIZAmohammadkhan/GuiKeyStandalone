@@ -1,13 +1,12 @@
 use crate::application::log_service::LogService;
-use crate::domain::event_types::{EventData, LogEvent, ClipboardActivity}; // Import ClipboardActivity
+use crate::domain::event_types::{EventData, LogEvent, ClipboardActivity};
 use crate::errors::ServerError;
-use actix_web::{web, get, HttpResponse, Responder}; // Responder for HttpResponse
-use askama::Template; // <<<<<<<<<<<< ENSURE THIS TRAIT IS IMPORTED
+use actix_web::{web, get, HttpResponse, Responder};
+use askama::Template;
 use serde::Deserialize;
 use std::marker::PhantomData;
 
-// New struct to pass pre-formatted clipboard data to the template
-#[derive(Debug)] // No Serialize/Deserialize needed if only for display
+#[derive(Debug)]
 struct DisplayClipboardActivity<'a> {
     timestamp_str: String,
     content_preview: &'a str,
@@ -15,7 +14,6 @@ struct DisplayClipboardActivity<'a> {
     content_hash_short: String,
 }
 
-// New struct to pass pre-formatted event data to the template
 struct DisplayLogEvent<'a> {
     id_str: String,
     client_id_str: String,
@@ -26,18 +24,16 @@ struct DisplayLogEvent<'a> {
     session_end_str: String,
     typed_text: &'a str,
     clipboard_actions: Vec<DisplayClipboardActivity<'a>>,
-    log_timestamp_str: String, // The LogEvent's main timestamp
+    log_timestamp_str: String,
 }
 
 #[derive(Template)]
 #[template(path = "logs_view.html")]
 struct LogsViewTemplate<'a> {
-    // Pass the display-ready structs
     display_events: Vec<DisplayLogEvent<'a>>,
     current_page: u32,
     total_pages: u32,
-    // Marker to help Askama resolve EventData if needed for more complex cases
-    // but with pre-formatting, we might not need it.
+    page_size: u32, // Added page_size for constructing links
     _marker: PhantomData<&'a EventData>,
 }
 
@@ -56,7 +52,7 @@ pub struct PaginationParams {
     page_size: u32,
 }
 fn default_page() -> u32 { 1 }
-fn default_page_size() -> u32 { 20 }
+fn default_page_size() -> u32 { 25 } // Default page size for display
 
 #[get("/")]
 pub async fn index_route() -> impl Responder {
@@ -77,16 +73,15 @@ pub async fn view_logs_route(
     );
 
     let current_page = query_params.page.max(1);
-    let page_size = query_params.page_size.max(1).min(100);
+    let page_size = query_params.page_size.max(1).min(100); // Keep page_size constrained
 
     let events = log_service.get_log_events_paginated(current_page, page_size).await?;
     let total_count = log_service.get_total_log_count().await?;
-    
+
     let total_pages = (total_count as f64 / page_size as f64).ceil() as u32;
 
-    // Prepare data for display to avoid complex logic in template
     let display_events: Vec<DisplayLogEvent> = events.iter().map(|event| {
-        let (session_start_str, session_end_str, typed_text_ref, display_clips) = 
+        let (session_start_str, session_end_str, typed_text_ref, display_clips) =
             if let EventData::ApplicationActivity { start_time, end_time, typed_text, clipboard_actions } = &event.event_data {
                 (
                     start_time.format("%Y-%m-%d %H:%M:%S").to_string(),
@@ -100,7 +95,6 @@ pub async fn view_logs_route(
                     }).collect()
                 )
         } else {
-            // Handle case where event_data might not be ApplicationActivity (if your enum grows)
             (String::new(), String::new(), "", Vec::new())
         };
 
@@ -117,15 +111,16 @@ pub async fn view_logs_route(
             log_timestamp_str: event.timestamp.format("%Y-%m-%d %H:%M:%S").to_string(),
         }
     }).collect();
-    
+
     let template = LogsViewTemplate {
-        display_events, // Pass the pre-formatted data
+        display_events,
         current_page,
         total_pages: total_pages.max(1),
+        page_size, // Pass current page_size to template
         _marker: PhantomData,
     };
 
-    match template.render() { // This should now find the render() method
+    match template.render() {
         Ok(html_body) => Ok(HttpResponse::Ok().content_type("text/html; charset=utf-8").body(html_body)),
         Err(askama_err) => {
             tracing::error!("WebUI: Error rendering logs_view template: {}", askama_err);
