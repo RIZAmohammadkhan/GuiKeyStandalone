@@ -1,5 +1,0 @@
-cargo:rustc-link-arg-bins=/MANIFEST:EMBED
-cargo:rustc-link-arg-bins=/MANIFESTINPUT:\\?\D:\RustMonitoringSuite\activity_monitor_client_core\target\debug\build\activity_monitor_client_core-acdccdc3df775faa\out\manifest.xml
-cargo:rustc-link-arg-bins=/MANIFESTUAC:NO
-cargo:rerun-if-changed=build.rs
-cargo:rerun-if-changed=App.manifest
