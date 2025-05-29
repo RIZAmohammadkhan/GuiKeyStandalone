@@ -1,0 +1,104 @@
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+.container {
+    width: 80%;
+    margin: auto;
+    overflow: hidden;
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+header {
+    background: #333;
+    color: #fff;
+    padding: 1rem 0;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+header h1 {
+    margin: 0;
+}
+
+.log-entry {
+    background: #fff;
+    border: 1px solid #ddd;
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 5px;
+}
+
+.log-entry h3 {
+    margin-top: 0;
+    color: #337ab7;
+}
+
+.log-entry p {
+    margin: 5px 0;
+}
+
+pre.typed-text {
+    background-color: #eee;
+    border: 1px solid #ccc;
+    padding: 10px;
+    white-space: pre-wrap; /* Allows long lines to wrap */
+    word-wrap: break-word; /* Breaks long words */
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.log-entry ul {
+    list-style: disc;
+    margin-left: 20px;
+}
+
+.event-meta {
+    font-size: 0.8em;
+    color: #777;
+    margin-top: 10px;
+}
+
+.pagination {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.pagination a {
+    color: #337ab7;
+    text-decoration: none;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    margin: 0 2px;
+}
+
+.pagination a:hover {
+    background-color: #eee;
+}
+
+.pagination span {
+    padding: 8px 12px;
+}
+
+.error {
+    color: red;
+    background-color: #ffebee;
+    border: 1px solid red;
+    padding: 10px;
+    margin-bottom: 15px;
+}
+
+footer {
+    text-align: center;
+    margin-top: 30px;
+    padding: 10px;
+    font-size: 0.9em;
+    color: #777;
+}

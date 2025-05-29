@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}View Logs - Page {{ current_page }}{% endblock %}
+{% block header_title %}Activity Log Viewer - Page {{ current_page }} of {{ total_pages }}{% endblock %}
+
+{% block content %}
+    {% if display_events.is_empty() %}
+        <p>No log events found for this page.</p>
+    {% else %}
+        {% for event in display_events %} {# Iterate over pre-formatted display_events #}
+            <div class="log-entry">
+                <h3>{{ event.application_name }}</h3>
+                <p><strong>Window:</strong> {{ event.initial_window_title }}</p>
+                <p><strong>Client ID:</strong> {{ event.client_id_str }}</p>
+                <p><strong>Schema:</strong> v{{ event.schema_version }}</p>
+                <p><strong>Session:</strong> {{ event.session_start_str }} - {{ event.session_end_str }} UTC</p>
+                {% if !event.typed_text.is_empty() %}
+                    <p><strong>Typed Text:</strong></p>
+                    <pre class="typed-text">{{ event.typed_text }}</pre>
+                {% endif %}
+                {% if !event.clipboard_actions.is_empty() %}
+                    <p><strong>Clipboard Actions ({{ event.clipboard_actions.len() }}):</strong></p>
+                    <ul>
+                        {% for clip in event.clipboard_actions %}
+                            <li>
+                                {{ clip.timestamp_str }}:
+                                <em>{{ clip.content_preview }}</em> ({{ clip.char_count }} chars, hash: {{ clip.content_hash_short }}...)
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <p class="event-meta"><em>Log ID: {{ event.id_str }}, Logged At (Session Start): {{ event.log_timestamp_str }} UTC</em></p>
+            </div>
+        {% endfor %}
+
+        <div class="pagination">
+            {% let link_page_size = 20 %}
+            {% if current_page > 1 %}
+                <a href="/logs?page={{ current_page - 1 }}&page_size={{ link_page_size }}">« Previous</a>
+            {% endif %}
+            <span>Page {{ current_page }} of {{ total_pages }}</span>
+            {% if current_page < total_pages %}
+                <a href="/logs?page={{ current_page + 1 }}&page_size={{ link_page_size }}">Next »</a>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

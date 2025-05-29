@@ -1,0 +1,32 @@
+# Example configuration for the Local Log Server
+# This file will be named 'local_server_config.toml' and placed next to the
+# local_log_server.exe executable by the activity_generator_gui.
+
+# Address and port for the server to listen on for API requests (from the client)
+# and for serving the Web UI.
+# For local operation, "127.0.0.1" is recommended to only allow connections
+# from the same machine. "0.0.0.0" would listen on all available network interfaces.
+listen_address = "127.0.0.1:8090"
+
+# The AES-256 encryption key in hexadecimal format (64 characters).
+# This MUST match the key configured into the activity_monitor_client_core.
+# The activity_generator_gui will generate this key and write it here.
+# For manual testing of this server, you'll need to put a valid key here.
+# Example (DO NOT USE FOR REAL, GENERATE YOUR OWN):
+encryption_key_hex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+
+# Path to the SQLite database file.
+# This path will be treated as relative to the server executable's directory.
+database_path = "activity_logs.sqlite"
+
+# How long to keep logs in the database, in days.
+# Logs older than this will be periodically deleted.
+# Set to 0 to disable automatic deletion (retain logs indefinitely).
+log_retention_days = 30
+
+# Optional: If you were to separate the Web UI port from the API listening port.
+# For the current setup, `listen_address` handles both.
+# web_ui_port = 8090
+
+# Optional: Server's own diagnostic log level (if you implement file logging for the server)
+# diagnostic_log_level = "info" # trace, debug, info, warn, error
