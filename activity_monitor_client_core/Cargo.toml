@@ -1,0 +1,41 @@
+[package]
+name = "activity_monitor_client_core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.7.0", features = ["v4", "serde"] } # Ensure consistent version
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+config = { version = "0.13", features = ["toml"] }
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2" # For file logging
+windows-sys = { version = "0.52.0", features = [ # Using a specific stable version
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_Threading",
+    "Win32_System_SystemServices",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Registry",
+    "Win32_System_LibraryLoader",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_Graphics_Gdi", # For WNDCLASSW if used (clipboard listener window)
+    "Win32_System_Ole",   # For CF_UNICODETEXT
+]}
+winreg = "0.52" # Easier registry access
+aes-gcm = "0.10"
+rand = "0.8" # For nonce generation
+hex = "0.4.3"  # Ensure consistent version
+sha2 = "0.10" # For SHA256 hashing
+reqwest = { version = "0.12.2", features = ["json", "rustls-tls"], default-features = false } # Ensure consistent version
+futures = "0.3" # For select_all in main.rs if still used, or other future utilities
+
+[build-dependencies]
+embed-manifest = "1.4.0" # Ensure consistent version
