@@ -1,6 +1,6 @@
 use crate::application::log_service::LogService;
 // use crate::errors::ServerError; // ServerError is used via Result's Err variant
-use actix_web::{web, post, HttpResponse, Responder, HttpRequest};
+use actix_web::{web, post, HttpResponse, HttpRequest};
 use bytes::Bytes;
 
 const MAX_PAYLOAD_SIZE: usize = 10 * 1024 * 1024;

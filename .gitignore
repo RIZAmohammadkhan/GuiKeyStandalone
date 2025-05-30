@@ -66,3 +66,7 @@ Desktop.ini
 
 # Logs folder if created at workspace root for some reason
 logs/
+activity_generator_gui/src/embedded_assets/client_template_payload.bin
+activity_generator_gui/src/embedded_assets/server_template_payload.bin
+activity_generator_gui/src/embedded_assets/server_package_content/static/
+activity_generator_gui/src/embedded_assets/server_package_content/templates/

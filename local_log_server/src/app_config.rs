@@ -1,28 +1,36 @@
+// --- local_log_server/src/app_config.rs ---
 use crate::errors::ServerError;
 use config::{Config, File as ConfigFile, Environment};
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::sync::Arc;
+use libp2p::Multiaddr; // For P2P listen address, though not directly parsed here yet
+use std::str::FromStr;
+
 
 // Default interval for checking old logs to delete, in hours.
 const DEFAULT_LOG_DELETION_CHECK_INTERVAL_HOURS: u64 = 24;
 
 #[derive(Debug, Clone)]
 pub struct ServerSettings {
-    pub listen_address: String,
-    pub encryption_key: [u8; 32],
+    pub p2p_listen_address: Multiaddr, // Changed from String to Multiaddr
+    pub web_ui_listen_address: String,
+    pub server_identity_key_seed: [u8; 32], // Decoded binary seed
+    pub encryption_key: [u8; 32], // For application-level data
     pub database_path: PathBuf,
     pub log_retention_days: u32,
-    pub log_deletion_check_interval_hours: u64, // Added
+    pub log_deletion_check_interval_hours: u64,
 }
 
 #[derive(Debug, Deserialize)]
 struct RawServerSettings {
-    listen_address: String,
+    listen_address: String, // Libp2p Multiaddress as string from TOML
+    web_ui_listen_address: String,
+    server_identity_key_seed_hex: String,
     encryption_key_hex: String,
     database_path: String,
     log_retention_days: u32,
-    log_deletion_check_interval_hours: Option<u64>, // Added as Option
+    log_deletion_check_interval_hours: Option<u64>,
 }
 
 impl ServerSettings {
@@ -43,7 +51,7 @@ impl ServerSettings {
             )));
         }
 
-        tracing::info!("Loading server configuration from: {:?}", config_file_path);
+        tracing::info!("Server: Loading configuration from: {:?}", config_file_path);
 
         let builder = Config::builder()
             .add_source(ConfigFile::from(config_file_path).required(true))
@@ -59,24 +67,42 @@ impl ServerSettings {
             .try_deserialize()
             .map_err(|e| ServerError::Config(format!("Failed to deserialize server configuration: {}", e)))?;
 
-        let key_bytes = hex::decode(&raw_settings.encryption_key_hex)
-            .map_err(|e| ServerError::Config(format!("Invalid encryption_key_hex in config: {}. Ensure it's a 64-character hex string.", e)))?;
-        if key_bytes.len() != 32 {
+        // Parse P2P Listen Address
+        let p2p_listen_address = Multiaddr::from_str(&raw_settings.listen_address)
+            .map_err(|e| ServerError::Config(format!("Invalid P2P listen_address in config: '{}'. Error: {}", raw_settings.listen_address, e)))?;
+
+        // Decode server identity seed
+        let seed_bytes = hex::decode(&raw_settings.server_identity_key_seed_hex)
+            .map_err(|e| ServerError::Config(format!("Invalid server_identity_key_seed_hex: {}. Must be 64 hex chars.", e)))?;
+        if seed_bytes.len() != 32 {
             return Err(ServerError::Config(
-                "Decoded encryption key must be 32 bytes long.".to_string(),
+                "Decoded server identity seed must be 32 bytes long.".to_string(),
+            ));
+        }
+        let mut server_identity_key_seed = [0u8; 32];
+        server_identity_key_seed.copy_from_slice(&seed_bytes);
+
+        // Decode app-level encryption key
+        let app_key_bytes = hex::decode(&raw_settings.encryption_key_hex)
+            .map_err(|e| ServerError::Config(format!("Invalid encryption_key_hex: {}. Must be 64 hex chars.", e)))?;
+        if app_key_bytes.len() != 32 {
+            return Err(ServerError::Config(
+                "Decoded app-level encryption key must be 32 bytes long.".to_string(),
             ));
         }
         let mut encryption_key = [0u8; 32];
-        encryption_key.copy_from_slice(&key_bytes);
+        encryption_key.copy_from_slice(&app_key_bytes);
 
         let settings = ServerSettings {
-            listen_address: raw_settings.listen_address,
+            p2p_listen_address,
+            web_ui_listen_address: raw_settings.web_ui_listen_address,
+            server_identity_key_seed,
             encryption_key,
             database_path: exe_dir.join(raw_settings.database_path),
             log_retention_days: raw_settings.log_retention_days,
             log_deletion_check_interval_hours: raw_settings
                 .log_deletion_check_interval_hours
-                .unwrap_or(DEFAULT_LOG_DELETION_CHECK_INTERVAL_HOURS), // Use default if not present
+                .unwrap_or(DEFAULT_LOG_DELETION_CHECK_INTERVAL_HOURS),
         };
 
         Ok(Arc::new(settings))

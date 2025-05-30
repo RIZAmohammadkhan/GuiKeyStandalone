@@ -6,13 +6,13 @@ edition = "2024"
 [dependencies]
 actix-web = "4.5.1"
 actix-files = "0.6.5"
-tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread", "signal"] } # Added "signal" for main
 serde = { version = "1.0.196", features = ["derive"] }
 serde_json = "1.0.113"
 chrono = { version = "0.4.33", features = ["serde"] }
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
 rusqlite = { version = "0.30.0", features = ["bundled", "chrono", "uuid"] }
-askama = "0.12.1" # Keep it simple, no extra features for now for 0.12.1
+askama = "0.12.1"
 thiserror = "1.0.57"
 hex = "0.4.3"
 aes-gcm = "0.10.3"
@@ -20,4 +20,23 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt"] }
 config = "0.13.4"
 toml = "0.8.8"
-bytes = "1.6.0"
+bytes = "1.6.0" # Keep for web_ui_handlers if it becomes necessary, but not for P2P log ingest
+
+# --- libp2p dependencies ---
+libp2p = { version = "0.55", features = [
+    "tokio",
+    "macros",
+    "mdns", # For local discovery
+    "kad",  # For Kademlia DHT
+    "identify", # For identifying peers
+    "request-response", # For our custom log sync protocol
+    "relay", # For relay capabilities (client and server parts)
+    "dcutr", # For NAT hole punching
+    "noise", # For transport encryption
+    "yamux", # For stream multiplexing
+    "tcp",   # For TCP transport
+    "dns",   # For DNS resolution of multiaddrs
+    "autonat", # For automatic NAT detection
+]}
+async-trait = "0.1.77" # For p2p::protocol.rs Codec
+futures = "0.3.30"     # For StreamExt in swarm_manager

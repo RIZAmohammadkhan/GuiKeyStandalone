@@ -1,0 +1,21 @@
+# D:/RustMonitoringSuite/Cargo.toml
+
+[workspace]
+resolver = "2" # Recommended for new workspaces
+members = [
+    "activity_generator_gui",
+    "activity_monitor_client_core",
+    "local_log_server",
+]
+
+# Optional: Default members for `cargo build` in root
+# default-members = ["activity_generator_gui"]
+
+# Optional: Workspace-level profiles or shared dependencies
+# [profile.release]
+# strip = true
+# lto = true
+# codegen-units = 1
+
+# [workspace.dependencies]  # This table is for sharing versions across members
+# some_shared_crate = "1.0" # fs_extra could go here if member crates also used it
