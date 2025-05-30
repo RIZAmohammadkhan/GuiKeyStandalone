@@ -11,8 +11,8 @@ pub struct GeneratorAppState {
     pub status_message: String,
     pub operation_in_progress: bool,
     pub generated_key_hex_display_snippet: String, // For app-level AES key
-    pub generated_client_id_display: String, // App-level UUID for client
-    pub generated_server_peer_id_display: String, // Libp2p PeerId for the server
+    pub generated_client_id_display: String,       // App-level UUID for client
+    pub generated_server_peer_id_display: String,  // Libp2p PeerId for the server
 }
 
 impl Default for GeneratorAppState {
@@ -23,7 +23,9 @@ impl Default for GeneratorAppState {
             bootstrap_addresses_str: default_client_config.bootstrap_addresses.join(", "), // Initialize from defaults
             client_config: default_client_config,
             server_config: LocalServerConfigOutput::new_with_defaults(),
-            status_message: "Welcome! Configure Output Dir, Bootstrap Addresses, and other settings.".to_string(),
+            status_message:
+                "Welcome! Configure Output Dir, Bootstrap Addresses, and other settings."
+                    .to_string(),
             operation_in_progress: false,
             generated_key_hex_display_snippet: "N/A".to_string(),
             generated_client_id_display: "N/A".to_string(),
@@ -34,6 +36,10 @@ impl Default for GeneratorAppState {
 
 impl GeneratorAppState {
     pub fn get_output_dir_path(&self) -> Option<PathBuf> {
-        if self.output_dir_path_str.is_empty() { None } else { Some(PathBuf::from(&self.output_dir_path_str)) }
+        if self.output_dir_path_str.is_empty() {
+            None
+        } else {
+            Some(PathBuf::from(&self.output_dir_path_str))
+        }
     }
 }

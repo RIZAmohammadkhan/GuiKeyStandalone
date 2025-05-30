@@ -91,7 +91,7 @@ impl ServerBehaviour {
 
         // DCUtR
         let dcutr = dcutr::Behaviour::new(local_peer_id);
-        
+
         // AutoNAT
         let autonat = autonat::Behaviour::new(local_peer_id, autonat_config);
 

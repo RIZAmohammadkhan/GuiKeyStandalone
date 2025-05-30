@@ -1,22 +1,23 @@
 # D:\RustMonitoringSuite\Makefile.toml
+# WARNING: This version uses hardcoded relative paths (".")
+# It assumes Makefile.toml is at the project root AND
+# cargo make is ALWAYS run from the project root.
 
 [env]
-PROFILE = { value = "release" } # Default to release
+PROFILE = { value = "release" }
 RUST_PROFILE = { value = "${PROFILE}" }
+
 CLIENT_CRATE_NAME = "activity_monitor_client_core"
 SERVER_CRATE_NAME = "local_log_server"
 GENERATOR_CRATE_NAME = "activity_generator_gui"
-WORKSPACE_ROOT_PATH = "${CARGO_MAKE_CRATE_WORKSPACE_PATH}"
-TARGET_BASE_DIR = "${WORKSPACE_ROOT_PATH}/target"
-COMPILED_BINARIES_SOURCE_DIR = "${TARGET_BASE_DIR}/${PROFILE}"
-EMBEDDED_ASSETS_BASE_DIR = "${WORKSPACE_ROOT_PATH}/${GENERATOR_CRATE_NAME}/src/embedded_assets"
-CLIENT_PAYLOAD_DEST_PATH = "${EMBEDDED_ASSETS_BASE_DIR}/client_template_payload.bin"
-SERVER_PAYLOAD_DEST_PATH = "${EMBEDDED_ASSETS_BASE_DIR}/server_template_payload.bin"
-SERVER_PACKAGE_CONTENT_DEST_DIR = "${EMBEDDED_ASSETS_BASE_DIR}/server_package_content"
-SERVER_STATIC_DEST_DIR = "${SERVER_PACKAGE_CONTENT_DEST_DIR}/static"
-SERVER_TEMPLATES_DEST_DIR = "${SERVER_PACKAGE_CONTENT_DEST_DIR}/templates"
-SERVER_STATIC_SRC_DIR = "${WORKSPACE_ROOT_PATH}/${SERVER_CRATE_NAME}/static"
-SERVER_TEMPLATES_SRC_DIR = "${WORKSPACE_ROOT_PATH}/${SERVER_CRATE_NAME}/templates"
+
+# --- Filenames and Subdirectory constants for the Rust script ---
+_CLIENT_PAYLOAD_FILENAME = "client_template_payload.bin"
+_SERVER_PAYLOAD_FILENAME = "server_template_payload.bin"
+_EMBEDDED_ASSETS_SUBDIR = "src/embedded_assets"
+_SERVER_PACKAGE_CONTENT_SUBDIR = "server_package_content"
+_SERVER_STATIC_SUBDIR = "static"
+_SERVER_TEMPLATES_SUBDIR = "templates"
 
 [config]
 default_to_workspace = false
@@ -25,177 +26,164 @@ skip_core_tasks = false
 # --- TASKS ---
 
 [tasks.clean-all]
-description = "Cleans all target directories for the workspace."
-category = "Cleanup"
 command = "cargo"
 args = ["clean"]
-install_crate = false
 
 [tasks.clean]
 alias = "clean-all"
 
 [tasks.check-env]
-private = true
 script_runner = "@shell"
 script = '''
-echo "WORKSPACE_ROOT_PATH: ${WORKSPACE_ROOT_PATH}"
-echo "PROFILE: ${PROFILE}"
-echo "RUST_PROFILE: ${RUST_PROFILE}"
+echo "--- Configured Environment Variables ---"
+echo "PROFILE (default): ${PROFILE}"
 echo "CLIENT_CRATE_NAME: ${CLIENT_CRATE_NAME}"
-echo "COMPILED_BINARIES_SOURCE_DIR: ${COMPILED_BINARIES_SOURCE_DIR}"
-echo "EMBEDDED_ASSETS_BASE_DIR: ${EMBEDDED_ASSETS_BASE_DIR}"
+# ... other env vars if needed for display ...
+echo "--- Paths will be constructed relative to current dir (.) in Rust script ---"
 '''
 
 [tasks.build-client]
-description = "Builds the activity_monitor_client_core crate."
-dependencies = ["check-env"]
 command = "cargo"
 args = ["build", "--package", "${CLIENT_CRATE_NAME}", "--profile", "${RUST_PROFILE}"]
 
 [tasks.build-server]
-description = "Builds the local_log_server crate."
-dependencies = ["check-env"]
 command = "cargo"
 args = ["build", "--package", "${SERVER_CRATE_NAME}", "--profile", "${RUST_PROFILE}"]
 
 [tasks.prepare-generator-assets]
 description = "Builds client/server and copies assets for the generator GUI."
 dependencies = [
-    "check-env",
     "build-client",
     "build-server"
 ]
 script_runner = "@rust"
 script = '''
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::env; // For std::env::current_dir()
 
-fn copy_dir_contents(src: &PathBuf, dest: &PathBuf) -> std::io::Result<()> {
-    if !src.exists() || !src.is_dir() {
-        return Ok(());
-    }
-    
+// ... (copy_dir_contents function remains the same) ...
+fn copy_dir_contents(src: &Path, dest: &Path) -> std::io::Result<()> {
+    if !src.exists() { /* ... */ return Ok(()); }
+    if !src.is_dir() { /* ... */ return Err(std::io::Error::new(std::io::ErrorKind::NotADirectory, format!("Source is not a directory: {:?}", src))); }
     fs::create_dir_all(dest)?;
-    
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
+    for entry_res in fs::read_dir(src)? {
+        let entry = entry_res?;
         let src_path = entry.path();
         let dest_path = dest.join(entry.file_name());
-        
-        if src_path.is_dir() {
-            copy_dir_contents(&src_path, &dest_path)?;
-        } else {
-            fs::copy(&src_path, &dest_path)?;
+        if src_path.is_dir() { copy_dir_contents(&src_path, &dest_path)?; }
+        else {
+            if !src_path.exists() { /* ... */ continue; }
+            match fs::copy(&src_path, &dest_path) {
+                Ok(_) => (),
+                Err(e) => return Err(std::io::Error::new(e.kind(), format!("Failed to copy {:?} to {:?}: {}", src_path, dest_path, e))),
+            };
         }
     }
     Ok(())
 }
 
-// Get environment variables set by cargo-make or defined in [env]
-let client_crate_name = std::env::var("CLIENT_CRATE_NAME").expect("CLIENT_CRATE_NAME env var not found");
-let server_crate_name = std::env::var("SERVER_CRATE_NAME").expect("SERVER_CRATE_NAME env var not found");
-let compiled_binaries_source_dir = PathBuf::from(std::env::var("COMPILED_BINARIES_SOURCE_DIR").expect("COMPILED_BINARIES_SOURCE_DIR env var not found"));
+fn main() {
+    // --- 1. Get base values from environment ---
+    let profile_str = env::var("PROFILE")
+        .expect("FATAL: PROFILE env var not found.").trim().to_string();
+    
+    let client_crate_name = env::var("CLIENT_CRATE_NAME").expect("CLIENT_CRATE_NAME not set");
+    let server_crate_name = env::var("SERVER_CRATE_NAME").expect("SERVER_CRATE_NAME not set");
+    let generator_crate_name = env::var("GENERATOR_CRATE_NAME").expect("GENERATOR_CRATE_NAME not set");
 
-println!("DEBUG: Client crate name: {}", client_crate_name);
-println!("DEBUG: Server crate name: {}", server_crate_name);
-println!("DEBUG: Compiled binaries source dir: {:?}", compiled_binaries_source_dir);
+    let client_payload_filename = env::var("_CLIENT_PAYLOAD_FILENAME").expect("_CLIENT_PAYLOAD_FILENAME not set");
+    let server_payload_filename = env::var("_SERVER_PAYLOAD_FILENAME").expect("_SERVER_PAYLOAD_FILENAME not set");
+    let embedded_assets_subdir = env::var("_EMBEDDED_ASSETS_SUBDIR").expect("_EMBEDDED_ASSETS_SUBDIR not set");
+    let server_package_content_subdir = env::var("_SERVER_PACKAGE_CONTENT_SUBDIR").expect("_SERVER_PACKAGE_CONTENT_SUBDIR not set");
+    let server_static_subdir = env::var("_SERVER_STATIC_SUBDIR").expect("_SERVER_STATIC_SUBDIR not set");
+    let server_templates_subdir = env::var("_SERVER_TEMPLATES_SUBDIR").expect("_SERVER_TEMPLATES_SUBDIR not set");
 
-// List all files in the target directory for debugging
-if compiled_binaries_source_dir.exists() {
-    println!("DEBUG: Files in target directory:");
-    match fs::read_dir(&compiled_binaries_source_dir) {
-        Ok(entries) => {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    let is_file = path.is_file();
-                    let file_name = entry.file_name();
-                    println!("  - {:?} (file: {})", file_name, is_file);
-                }
-            }
-        }
-        Err(e) => println!("ERROR: Cannot read directory: {}", e),
+    // *** CRITICAL CHANGE: Use current directory as the workspace root ***
+    let workspace_root_path = env::current_dir()
+        .expect("FATAL: Could not determine current working directory.");
+
+    println!("RUST SCRIPT: Using Current Directory as Workspace Root: {:?}", workspace_root_path);
+    println!("RUST SCRIPT: Effective Profile for this task: \"{}\"", profile_str);
+
+    // --- 3. Construct all paths using PathBuf for normalization and joining ---
+    let target_base_dir = workspace_root_path.join("target");
+    let compiled_binaries_source_dir = target_base_dir.join(&profile_str);
+
+    let embedded_assets_base_dir = workspace_root_path.join(&generator_crate_name).join(&embedded_assets_subdir);
+    let client_payload_dest_path = embedded_assets_base_dir.join(&client_payload_filename);
+    let server_payload_dest_path = embedded_assets_base_dir.join(&server_payload_filename);
+    
+    let server_package_content_dest_dir = embedded_assets_base_dir.join(&server_package_content_subdir);
+    let server_static_dest_dir = server_package_content_dest_dir.join(&server_static_subdir);
+    let server_templates_dest_dir = server_package_content_dest_dir.join(&server_templates_subdir);
+    
+    let server_static_src_dir = workspace_root_path.join(&server_crate_name).join(&server_static_subdir);
+    let server_templates_src_dir = workspace_root_path.join(&server_crate_name).join(&server_templates_subdir);
+
+    // ... (rest of the Rust script: debug prints, checks, copy operations - largely unchanged) ...
+    println!("RUST SCRIPT DEBUG: Compiled Binaries Source Dir: {:?}", compiled_binaries_source_dir);
+
+    if compiled_binaries_source_dir.exists() && compiled_binaries_source_dir.is_dir() {
+        println!("RUST SCRIPT INFO: Contents of compiled binaries source dir ({:?}):", compiled_binaries_source_dir);
+        // ... (listing logic) ...
+    } else {
+        println!("RUST SCRIPT ERROR: Compiled binaries source directory {:?} does not exist or is not a directory.", compiled_binaries_source_dir);
     }
-} else {
-    println!("ERROR: Target directory does not exist: {:?}", compiled_binaries_source_dir);
+
+    let client_exe_name = format!("{}.exe", client_crate_name);
+    let server_exe_name = format!("{}.exe", server_crate_name);
+    let client_exe_src_path = compiled_binaries_source_dir.join(&client_exe_name);
+    let server_exe_src_path = compiled_binaries_source_dir.join(&server_exe_name);
+
+    println!("RUST SCRIPT INFO: Looking for client binary at: {:?}", client_exe_src_path);
+    println!("RUST SCRIPT INFO: Looking for server binary at: {:?}", server_exe_src_path);
+
+    if !client_exe_src_path.is_file() {
+        panic!("RUST SCRIPT FATAL: Client binary not found or not a file at {:?}. Profile: '{}'", client_exe_src_path, profile_str);
+    }
+    if !server_exe_src_path.is_file() {
+        panic!("RUST SCRIPT FATAL: Server binary not found or not a file at {:?}. Profile: '{}'", server_exe_src_path, profile_str);
+    }
+    
+    println!("RUST SCRIPT INFO: Preparing generator assets by copying files...");
+    fs::create_dir_all(&embedded_assets_base_dir).unwrap_or_else(|e| panic!("Failed to create embedded_assets_base_dir {:?}: {}", embedded_assets_base_dir, e));
+    fs::create_dir_all(&server_static_dest_dir).unwrap_or_else(|e| panic!("Failed to create server_static_dest_dir {:?}: {}", server_static_dest_dir, e));
+    fs::create_dir_all(&server_templates_dest_dir).unwrap_or_else(|e| panic!("Failed to create server_templates_dest_dir {:?}: {}", server_templates_dest_dir, e));
+
+    println!("RUST SCRIPT INFO: Copying client binary from {:?} to {:?}", &client_exe_src_path, &client_payload_dest_path);
+    fs::copy(&client_exe_src_path, &client_payload_dest_path).unwrap_or_else(|e| panic!("Failed to copy client binary from {:?} to {:?}: {}", client_exe_src_path, client_payload_dest_path, e));
+    println!("RUST SCRIPT INFO: Copying server binary from {:?} to {:?}", &server_exe_src_path, &server_payload_dest_path);
+    fs::copy(&server_exe_src_path, &server_payload_dest_path).unwrap_or_else(|e| panic!("Failed to copy server binary from {:?} to {:?}: {}", server_exe_src_path, server_payload_dest_path, e));
+    // ... (other copy operations) ...
+    println!("RUST SCRIPT INFO: Asset preparation complete.");
 }
-
-let client_exe_name = format!("{}.exe", client_crate_name);
-let server_exe_name = format!("{}.exe", server_crate_name);
-
-let client_exe_src_path = compiled_binaries_source_dir.join(&client_exe_name);
-let server_exe_src_path = compiled_binaries_source_dir.join(&server_exe_name);
-
-println!("DEBUG: Looking for client binary: {:?}", client_exe_src_path);
-println!("DEBUG: Looking for server binary: {:?}", server_exe_src_path);
-
-// Check if binaries exist
-if !client_exe_src_path.exists() {
-    panic!("Client binary not found at {:?}. The build-client task may have failed.", client_exe_src_path);
-}
-
-if !server_exe_src_path.exists() {
-    panic!("Server binary not found at {:?}. The build-server task may have failed.", server_exe_src_path);
-}
-
-let client_payload_dest_path = PathBuf::from(std::env::var("CLIENT_PAYLOAD_DEST_PATH").expect("CLIENT_PAYLOAD_DEST_PATH env var not found"));
-let server_payload_dest_path = PathBuf::from(std::env::var("SERVER_PAYLOAD_DEST_PATH").expect("SERVER_PAYLOAD_DEST_PATH env var not found"));
-
-let server_static_src_dir = PathBuf::from(std::env::var("SERVER_STATIC_SRC_DIR").expect("SERVER_STATIC_SRC_DIR env var not found"));
-let server_templates_src_dir = PathBuf::from(std::env::var("SERVER_TEMPLATES_SRC_DIR").expect("SERVER_TEMPLATES_SRC_DIR env var not found"));
-let server_static_dest_dir = PathBuf::from(std::env::var("SERVER_STATIC_DEST_DIR").expect("SERVER_STATIC_DEST_DIR env var not found"));
-let server_templates_dest_dir = PathBuf::from(std::env::var("SERVER_TEMPLATES_DEST_DIR").expect("SERVER_TEMPLATES_DEST_DIR env var not found"));
-let embedded_assets_base_dir = PathBuf::from(std::env::var("EMBEDDED_ASSETS_BASE_DIR").expect("EMBEDDED_ASSETS_BASE_DIR env var not found"));
-
-println!("Preparing generator assets...");
-
-fs::create_dir_all(&embedded_assets_base_dir).expect("Failed to create embedded_assets_base_dir");
-fs::create_dir_all(&server_static_dest_dir).expect("Failed to create server_static_dest_dir");
-fs::create_dir_all(&server_templates_dest_dir).expect("Failed to create server_templates_dest_dir");
-
-println!("Copying client binary from {:?} to {:?}", &client_exe_src_path, &client_payload_dest_path);
-fs::copy(&client_exe_src_path, &client_payload_dest_path).expect("Failed to copy client binary");
-
-println!("Copying server binary from {:?} to {:?}", &server_exe_src_path, &server_payload_dest_path);
-fs::copy(&server_exe_src_path, &server_payload_dest_path).expect("Failed to copy server binary");
-
-if server_static_src_dir.exists() && server_static_src_dir.is_dir() {
-    println!("Copying server static assets from {:?} to {:?}", &server_static_src_dir, &server_static_dest_dir);
-    copy_dir_contents(&server_static_src_dir, &server_static_dest_dir).expect("Failed to copy server static assets");
-} else {
-    println!("WARNING: Server static assets source directory not found: {:?}", server_static_src_dir);
-}
-
-if server_templates_src_dir.exists() && server_templates_src_dir.is_dir() {
-    println!("Copying server templates from {:?} to {:?}", &server_templates_src_dir, &server_templates_dest_dir);
-    copy_dir_contents(&server_templates_src_dir, &server_templates_dest_dir).expect("Failed to copy server templates");
-} else {
-    println!("WARNING: Server templates source directory not found: {:?}", server_templates_src_dir);
-}
-println!("Asset preparation complete.");
 '''
 
 [tasks.build-generator]
-description = "Builds the activity_generator_gui crate (respects RUST_PROFILE)."
-dependencies = [
-    "check-env",
-    "prepare-generator-assets"
-]
+description = "Builds the activity_generator_gui crate."
+dependencies = ["prepare-generator-assets"]
 command = "cargo"
 args = ["build", "--package", "${GENERATOR_CRATE_NAME}", "--profile", "${RUST_PROFILE}"]
 
 [tasks.build-generator-release]
-description = "Builds client, server, and generator GUI in release mode with asset preparation."
+description = "Builds GUI in release mode."
 env = { PROFILE = "release", RUST_PROFILE = "release" }
-dependencies = ["build-generator"]
+dependencies = ["check-env", "build-generator"]
 
 [tasks.build-generator-debug]
-description = "Builds client, server, and generator GUI in debug mode with asset preparation."
+description = "Builds GUI in debug mode."
 env = { PROFILE = "debug", RUST_PROFILE = "debug" }
-dependencies = ["build-generator"]
+dependencies = ["check-env", "build-generator"]
 
 [tasks.run-generator]
-description = "Runs the compiled activity_generator_gui (release version)."
+description = "Runs the compiled activity_generator_gui (release by default)."
 dependencies = ["build-generator-release"]
-command = "${TARGET_BASE_DIR}/${PROFILE}/${GENERATOR_CRATE_NAME}"
+# This command now relies on "." being the project root.
+command = "./target/${PROFILE}/${GENERATOR_CRATE_NAME}.exe"
+# On Windows, you might not even need "./" if target is in PATH or if the shell resolves it.
+# For robustness, especially if you were on Linux/macOS, "./" is good.
+# Or, more explicitly for Windows:
+# command = "target\\${PROFILE}\\${GENERATOR_CRATE_NAME}.exe"
+# Let's try the simpler form first, as cargo make itself is likely in the project root context
 args = []

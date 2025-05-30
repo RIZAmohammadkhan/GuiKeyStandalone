@@ -1,13 +1,10 @@
 use crate::app_config::ServerSettings;
 use crate::domain::event_types::LogEvent;
 use crate::errors::ServerError;
-use crate::infrastructure::{
-    database::DbConnection,
-    encryption::decrypt_payload,
-};
+use crate::infrastructure::{database::DbConnection, encryption::decrypt_payload};
 use actix_web::web; // For web::block
 use std::sync::Arc;
-use tokio::time::{interval, Duration, MissedTickBehavior};
+use tokio::time::{Duration, MissedTickBehavior, interval};
 
 #[derive(Clone)]
 pub struct LogService {
@@ -51,7 +48,7 @@ impl LogService {
         let decrypted_json_bytes = web::block(move || decrypt_payload(&encrypted_data, &key_clone))
             .await
             .map_err(map_blocking_error)??; // This is correct if we want Vec<u8> here.
-        
+
         tracing::trace!("LogService: Successfully decrypted payload.");
 
         let log_events: Vec<LogEvent> = serde_json::from_slice(&decrypted_json_bytes)
@@ -66,10 +63,16 @@ impl LogService {
             })?;
 
         let num_events = log_events.len();
-        tracing::debug!("LogService: Deserialized {} log events from client_id: {}.", num_events, client_id_str);
+        tracing::debug!(
+            "LogService: Deserialized {} log events from client_id: {}.",
+            num_events,
+            client_id_str
+        );
 
         if num_events == 0 {
-            tracing::debug!("LogService: Received empty batch of events (after deserialization). Nothing to store.");
+            tracing::debug!(
+                "LogService: Received empty batch of events (after deserialization). Nothing to store."
+            );
             return Ok(0);
         }
 
@@ -80,7 +83,11 @@ impl LogService {
             .await
             .map_err(map_blocking_error)??;
 
-        tracing::info!("LogService: Successfully stored {} log events from client_id: {}.", num_events, client_id_str);
+        tracing::info!(
+            "LogService: Successfully stored {} log events from client_id: {}.",
+            num_events,
+            client_id_str
+        );
         Ok(num_events)
     }
 
@@ -89,7 +96,11 @@ impl LogService {
         page: u32,
         page_size: u32,
     ) -> Result<Vec<LogEvent>, ServerError> {
-        tracing::debug!("LogService: Querying log events - page: {}, page_size: {}", page, page_size);
+        tracing::debug!(
+            "LogService: Querying log events - page: {}, page_size: {}",
+            page,
+            page_size
+        );
         let db_conn_clone = self.db_conn.clone();
         // Closure returns Result<Vec<LogEvent>, ServerError>
         // web::block(...).await.map_err(...) -> Result<Result<Vec<LogEvent>, ServerError>, ServerError>
@@ -130,7 +141,10 @@ impl LogService {
         let deleted_count = self.delete_old_logs_from_db().await?;
 
         if deleted_count > 0 {
-            tracing::info!("LogService: Scheduled deletion removed {} old log entries.", deleted_count);
+            tracing::info!(
+                "LogService: Scheduled deletion removed {} old log entries.",
+                deleted_count
+            );
         } else {
             tracing::debug!("LogService: Scheduled deletion found no old logs to remove.");
         }
@@ -160,7 +174,10 @@ pub fn spawn_periodic_log_deletion_task(log_service: LogService) {
             match log_service.run_scheduled_log_deletion().await {
                 Ok(count) => {
                     // This trace is fine, count is known.
-                    tracing::debug!("LogService: Periodic deletion task completed, {} entries affected.", count);
+                    tracing::debug!(
+                        "LogService: Periodic deletion task completed, {} entries affected.",
+                        count
+                    );
                 }
                 Err(e) => {
                     tracing::error!("LogService: Error during periodic log deletion: {}", e);

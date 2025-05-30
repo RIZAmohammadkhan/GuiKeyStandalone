@@ -3,17 +3,17 @@
 use std::{collections::HashMap, error::Error, sync::Arc, time::Duration};
 
 use futures::StreamExt; // for select_next_some()
-use tokio::sync::{mpsc, watch, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 
 use libp2p::{
-    core::{upgrade, transport::OrTransport},
+    Multiaddr, PeerId, Swarm, Transport,
+    core::{transport::OrTransport, upgrade},
     dns::tokio::Transport as DnsTransport,
-    identity::Keypair,
     identify::Config as IdentifyConfig,
+    identity::Keypair,
     relay::client as relay_client,
     swarm::SwarmEvent,
     tcp::tokio::Transport as TcpTransport,
-    Multiaddr, PeerId, Transport, Swarm,
 };
 // Explicit noise and yamux imports for libp2p 0.55 direct usage
 use libp2p::noise;
@@ -31,7 +31,10 @@ use crate::{
 /// Commands sent _into_ the SwarmManager.
 #[derive(Debug)]
 pub enum SwarmCommand {
-    DialPeer { peer: PeerId, addr: Multiaddr }, // Mostly for testing or explicit connection management
+    DialPeer {
+        peer: PeerId,
+        addr: Multiaddr,
+    }, // Mostly for testing or explicit connection management
     SendLogBatch {
         target_peer_id: PeerId,
         request: LogBatchRequest,
@@ -44,7 +47,8 @@ pub async fn run_swarm_manager(
     settings: Arc<Settings>,
     mut cmd_rx: mpsc::Receiver<SwarmCommand>,
     mut shutdown_rx: watch::Receiver<bool>,
-) -> Result<(), Box<dyn Error>> { // Using Box<dyn Error> for broader error compatibility
+) -> Result<(), Box<dyn Error>> {
+    // Using Box<dyn Error> for broader error compatibility
     // 1) Identity
     // For a real application, you'd likely load/save this keypair to maintain a stable PeerId.
     let id_keys = Keypair::generate_ed25519();
@@ -56,8 +60,7 @@ pub async fn run_swarm_manager(
     let tcp_transport = TcpTransport::new(tcp_transport_config);
     let dns_tcp_transport = DnsTransport::system(tcp_transport)?; // Remove .await
 
-    let (relay_client_transport, relay_client_behaviour) =
-        relay_client::new(local_peer_id);
+    let (relay_client_transport, relay_client_behaviour) = relay_client::new(local_peer_id);
 
     // Noise keys derived from the identity keypair for encryption
     let noise_config = noise::Config::new(&id_keys).expect("Signing noise static keypair failed");
@@ -76,7 +79,10 @@ pub async fn run_swarm_manager(
         format!("/guikey_standalone-client/0.1.0/{}", settings.client_id),
         id_keys.public().clone(),
     )
-    .with_agent_version(format!("activity-monitor-client-core/{}", env!("CARGO_PKG_VERSION")));
+    .with_agent_version(format!(
+        "activity-monitor-client-core/{}",
+        env!("CARGO_PKG_VERSION")
+    ));
 
     // ClientBehaviour struct encapsulates Kademlia, Request-Response, Identify, Relay, DCUtR, AutoNAT
     let behaviour = ClientBehaviour::new(
@@ -100,32 +106,53 @@ pub async fn run_swarm_manager(
             libp2p::multiaddr::Protocol::P2p(peer_id) => Some(peer_id), // The hash is already a PeerId
             _ => None,
         }) {
-            tracing::info!("SwarmManager: Adding bootstrap node to Kademlia: {} @ {}", peer_id, addr);
-            swarm.behaviour_mut().kademlia.add_address(&peer_id, addr.clone());
+            tracing::info!(
+                "SwarmManager: Adding bootstrap node to Kademlia: {} @ {}",
+                peer_id,
+                addr
+            );
+            swarm
+                .behaviour_mut()
+                .kademlia
+                .add_address(&peer_id, addr.clone());
         } else {
-            tracing::warn!("SwarmManager: Could not parse PeerId from bootstrap address: {}. It might not be used effectively by Kademlia.", addr);
+            tracing::warn!(
+                "SwarmManager: Could not parse PeerId from bootstrap address: {}. It might not be used effectively by Kademlia.",
+                addr
+            );
         }
     }
 
     // Initiate Kademlia bootstrap if bootstrap nodes are configured
     if !settings.bootstrap_addresses.is_empty() {
         match swarm.behaviour_mut().kademlia.bootstrap() {
-            Ok(id) => tracing::info!("SwarmManager: Kademlia bootstrap process initiated with query ID: {:?}", id),
+            Ok(id) => tracing::info!(
+                "SwarmManager: Kademlia bootstrap process initiated with query ID: {:?}",
+                id
+            ),
             Err(e) => tracing::warn!("SwarmManager: Kademlia bootstrap failed to start: {:?}", e),
         }
     } else {
-        tracing::info!("SwarmManager: No bootstrap addresses configured for Kademlia. Peer discovery may be limited.");
+        tracing::info!(
+            "SwarmManager: No bootstrap addresses configured for Kademlia. Peer discovery may be limited."
+        );
     }
 
     // Kademlia will attempt to find the server's addresses using its PeerId.
     let server_target_peer_id = settings.server_peer_id;
-    tracing::info!("SwarmManager: Kademlia will attempt to find and connect to server PeerId: {}", server_target_peer_id);
-    swarm.behaviour_mut().kademlia.get_closest_peers(server_target_peer_id);
+    tracing::info!(
+        "SwarmManager: Kademlia will attempt to find and connect to server PeerId: {}",
+        server_target_peer_id
+    );
+    swarm
+        .behaviour_mut()
+        .kademlia
+        .get_closest_peers(server_target_peer_id);
 
     // Store pending outbound request responders
     let mut pending_outbound_log_requests: HashMap<
         libp2p::request_response::OutboundRequestId,
-        oneshot::Sender<Result<LogBatchResponse, AppError>>
+        oneshot::Sender<Result<LogBatchResponse, AppError>>,
     > = HashMap::new();
 
     // 5) Event Loop
@@ -214,7 +241,7 @@ pub async fn run_swarm_manager(
                                                         tracing::warn!("SwarmManager: Kademlia lookup for server PeerID {} did not return the server itself among closest peers.", server_target_peer_id);
                                                     }
                                                 }
-                                                
+
                                                 libp2p::kad::QueryResult::GetClosestPeers(Err(err)) => {
                                                     tracing::warn!("SwarmManager: EVT Kademlia GetClosestPeers query failed: {:?}", err);
                                                 }

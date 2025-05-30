@@ -1,12 +1,11 @@
 // --- local_log_server/src/app_config.rs ---
 use crate::errors::ServerError;
-use config::{Config, File as ConfigFile, Environment};
-use serde::Deserialize;
-use std::path::{PathBuf};
-use std::sync::Arc;
+use config::{Config, Environment, File as ConfigFile};
 use libp2p::Multiaddr; // For P2P listen address, though not directly parsed here yet
+use serde::Deserialize;
+use std::path::PathBuf;
 use std::str::FromStr;
-
+use std::sync::Arc;
 
 // Default interval for checking old logs to delete, in hours.
 const DEFAULT_LOG_DELETION_CHECK_INTERVAL_HOURS: u64 = 24;
@@ -16,7 +15,7 @@ pub struct ServerSettings {
     pub p2p_listen_address: Multiaddr, // Changed from String to Multiaddr
     pub web_ui_listen_address: String,
     pub server_identity_key_seed: [u8; 32], // Decoded binary seed
-    pub encryption_key: [u8; 32], // For application-level data
+    pub encryption_key: [u8; 32],           // For application-level data
     pub database_path: PathBuf,
     pub log_retention_days: u32,
     pub log_deletion_check_interval_hours: u64,
@@ -35,8 +34,9 @@ struct RawServerSettings {
 
 impl ServerSettings {
     pub fn new() -> Result<Arc<Self>, ServerError> {
-        let exe_path = std::env::current_exe()
-            .map_err(|e| ServerError::Config(format!("Failed to determine executable path: {}", e)))?;
+        let exe_path = std::env::current_exe().map_err(|e| {
+            ServerError::Config(format!("Failed to determine executable path: {}", e))
+        })?;
         let exe_dir = exe_path.parent().ok_or_else(|| {
             ServerError::Config("Failed to determine executable directory.".to_string())
         })?;
@@ -63,17 +63,30 @@ impl ServerSettings {
 
         let raw_settings: RawServerSettings = builder
             .build()
-            .map_err(|e| ServerError::Config(format!("Failed to build server configuration: {}", e)))?
+            .map_err(|e| {
+                ServerError::Config(format!("Failed to build server configuration: {}", e))
+            })?
             .try_deserialize()
-            .map_err(|e| ServerError::Config(format!("Failed to deserialize server configuration: {}", e)))?;
+            .map_err(|e| {
+                ServerError::Config(format!("Failed to deserialize server configuration: {}", e))
+            })?;
 
         // Parse P2P Listen Address
-        let p2p_listen_address = Multiaddr::from_str(&raw_settings.listen_address)
-            .map_err(|e| ServerError::Config(format!("Invalid P2P listen_address in config: '{}'. Error: {}", raw_settings.listen_address, e)))?;
+        let p2p_listen_address =
+            Multiaddr::from_str(&raw_settings.listen_address).map_err(|e| {
+                ServerError::Config(format!(
+                    "Invalid P2P listen_address in config: '{}'. Error: {}",
+                    raw_settings.listen_address, e
+                ))
+            })?;
 
         // Decode server identity seed
-        let seed_bytes = hex::decode(&raw_settings.server_identity_key_seed_hex)
-            .map_err(|e| ServerError::Config(format!("Invalid server_identity_key_seed_hex: {}. Must be 64 hex chars.", e)))?;
+        let seed_bytes = hex::decode(&raw_settings.server_identity_key_seed_hex).map_err(|e| {
+            ServerError::Config(format!(
+                "Invalid server_identity_key_seed_hex: {}. Must be 64 hex chars.",
+                e
+            ))
+        })?;
         if seed_bytes.len() != 32 {
             return Err(ServerError::Config(
                 "Decoded server identity seed must be 32 bytes long.".to_string(),
@@ -83,8 +96,12 @@ impl ServerSettings {
         server_identity_key_seed.copy_from_slice(&seed_bytes);
 
         // Decode app-level encryption key
-        let app_key_bytes = hex::decode(&raw_settings.encryption_key_hex)
-            .map_err(|e| ServerError::Config(format!("Invalid encryption_key_hex: {}. Must be 64 hex chars.", e)))?;
+        let app_key_bytes = hex::decode(&raw_settings.encryption_key_hex).map_err(|e| {
+            ServerError::Config(format!(
+                "Invalid encryption_key_hex: {}. Must be 64 hex chars.",
+                e
+            ))
+        })?;
         if app_key_bytes.len() != 32 {
             return Err(ServerError::Config(
                 "Decoded app-level encryption key must be 32 bytes long.".to_string(),

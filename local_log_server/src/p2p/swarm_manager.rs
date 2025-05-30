@@ -1,22 +1,25 @@
 // --- local_log_server/src/p2p/swarm_manager.rs ---
-use std::{error::Error, sync::Arc, time::Duration, str::FromStr};
 use futures::StreamExt;
+use std::{error::Error, str::FromStr, sync::Arc, time::Duration};
 use tokio::sync::watch;
 
+use libp2p::noise;
+use libp2p::yamux;
 use libp2p::{
-    core::{upgrade, transport::OrTransport},
+    Multiaddr,
+    PeerId,
+    Swarm,
+    Transport,
+    core::{transport::OrTransport, upgrade},
     dns::tokio::Transport as DnsTransport,
-    identity::{Keypair, ed25519::SecretKey},
     identify::Config as IdentifyConfig,
+    identity::{Keypair, ed25519::SecretKey},
     kad::{Config as KademliaConfig, store::MemoryStore},
     // relay, // For relay server functionality if enabled
     request_response::ResponseChannel, // Import ResponseChannel
     swarm::SwarmEvent,
     tcp::tokio::Transport as TcpTransport,
-    Multiaddr, PeerId, Transport, Swarm,
 };
-use libp2p::noise;
-use libp2p::yamux;
 
 use crate::{
     app_config::ServerSettings,
@@ -28,16 +31,20 @@ use crate::{
     },
 };
 
-
 pub async fn run_server_swarm_manager(
     settings: Arc<ServerSettings>,
     log_service: LogService,
     mut shutdown_rx: watch::Receiver<bool>,
-) -> Result<(), Box<dyn Error + Send + Sync>> { // Ensure error type is Send + Sync for tokio::spawn
-    
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Ensure error type is Send + Sync for tokio::spawn
+
     // 1. Identity
-    let secret_key = SecretKey::try_from_bytes(settings.server_identity_key_seed)
-        .map_err(|e| Box::new(ServerError::Config(format!("Invalid server identity seed: {}", e))) as Box<dyn Error + Send + Sync>)?;
+    let secret_key = SecretKey::try_from_bytes(settings.server_identity_key_seed).map_err(|e| {
+        Box::new(ServerError::Config(format!(
+            "Invalid server identity seed: {}",
+            e
+        ))) as Box<dyn Error + Send + Sync>
+    })?;
     let local_key = Keypair::from(libp2p::identity::ed25519::Keypair::from(secret_key));
     let local_peer_id = PeerId::from(local_key.public());
     tracing::info!("Server P2P: Local PeerId = {}", local_peer_id);
@@ -59,7 +66,7 @@ pub async fn run_server_swarm_manager(
         local_key.public().clone(),
     )
     .with_agent_version(format!("local-log-server/{}", env!("CARGO_PKG_VERSION")));
-    
+
     let mut kad_config = KademliaConfig::default();
     let autonat_config = libp2p::autonat::Config {
         boot_delay: Duration::from_secs(10),
@@ -67,12 +74,8 @@ pub async fn run_server_swarm_manager(
         ..Default::default()
     };
 
-    let behaviour = ServerBehaviour::new(
-        local_peer_id,
-        identify_config,
-        kad_config,
-        autonat_config,
-    );
+    let behaviour =
+        ServerBehaviour::new(local_peer_id, identify_config, kad_config, autonat_config);
 
     // 4. Swarm
     let mut swarm = Swarm::new(
@@ -85,12 +88,15 @@ pub async fn run_server_swarm_manager(
 
     // 5. Listen on configured P2P multiaddress
     swarm.listen_on(settings.p2p_listen_address.clone())?;
-    tracing::info!("Server P2P: Attempting to listen on {}", settings.p2p_listen_address);
+    tracing::info!(
+        "Server P2P: Attempting to listen on {}",
+        settings.p2p_listen_address
+    );
 
     tracing::info!("Server P2P: Swarm manager entering main event loop...");
     loop {
         tokio::select! {
-            biased; 
+            biased;
 
             _ = shutdown_rx.changed() => {
                 if *shutdown_rx.borrow() {
@@ -125,7 +131,7 @@ pub async fn run_server_swarm_manager(
                                                 "Server P2P: Received LogBatchRequest from Peer {} (App Client ID: {}), payload size: {}",
                                                 peer, request.app_client_id, request.encrypted_log_payload.len()
                                             );
-                                            
+
                                             let log_service_clone = log_service.clone();
                                             // ** CORRECTED PART START **
                                             // We pass the `channel` (ResponseChannel) to the spawned task.

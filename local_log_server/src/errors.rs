@@ -45,9 +45,9 @@ impl From<actix_web::Error> for ServerError {
     }
 }
 impl From<actix_web::error::PayloadError> for ServerError {
-   fn from(err: actix_web::error::PayloadError) -> Self {
-       ServerError::ApiRequest(format!("Payload error: {}", err))
-   }
+    fn from(err: actix_web::error::PayloadError) -> Self {
+        ServerError::ApiRequest(format!("Payload error: {}", err))
+    }
 }
 
 // We can also implement actix_web::ResponseError for ServerError

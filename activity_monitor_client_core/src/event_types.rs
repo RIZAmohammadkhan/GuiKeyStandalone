@@ -14,7 +14,9 @@ pub struct LogEvent {
     pub schema_version: u32,
 }
 
-fn default_schema_version() -> u32 { 2 } // Start with schema version 2 for this new format
+fn default_schema_version() -> u32 {
+    2
+} // Start with schema version 2 for this new format
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", content = "data")] // "type" will be "ApplicationActivity"

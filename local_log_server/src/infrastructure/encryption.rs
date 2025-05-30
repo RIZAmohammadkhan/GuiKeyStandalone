@@ -9,17 +9,24 @@ const NONCE_SIZE: usize = 12; // Standard for AES-GCM (96-bit)
 /// Decrypts a payload that was encrypted with AES-256-GCM.
 /// The payload is expected to be: NONCE (12 bytes) || CIPHERTEXT_WITH_TAG.
 /// The authentication tag is expected to be appended to the ciphertext.
-pub fn decrypt_payload(encrypted_data_with_nonce: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, ServerError> {
+pub fn decrypt_payload(
+    encrypted_data_with_nonce: &[u8],
+    key: &[u8; 32],
+) -> Result<Vec<u8>, ServerError> {
     if encrypted_data_with_nonce.len() < NONCE_SIZE {
-        tracing::warn!("Encrypted data too short to contain nonce. Length: {}", encrypted_data_with_nonce.len());
-        return Err(ServerError::Crypto("Encrypted data too short for nonce.".to_string()));
+        tracing::warn!(
+            "Encrypted data too short to contain nonce. Length: {}",
+            encrypted_data_with_nonce.len()
+        );
+        return Err(ServerError::Crypto(
+            "Encrypted data too short for nonce.".to_string(),
+        ));
     }
 
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| {
-            tracing::error!("Failed to create AES cipher for decryption: {}", e);
-            ServerError::Crypto(format!("Failed to create AES cipher: {}", e))
-        })?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| {
+        tracing::error!("Failed to create AES cipher for decryption: {}", e);
+        ServerError::Crypto(format!("Failed to create AES cipher: {}", e))
+    })?;
 
     let (nonce_bytes, ciphertext_with_tag) = encrypted_data_with_nonce.split_at(NONCE_SIZE);
     let nonce = Nonce::from_slice(nonce_bytes);

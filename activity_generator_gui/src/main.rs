@@ -5,9 +5,9 @@ mod config_models;
 mod errors;
 mod generator_logic;
 
-use eframe::{egui, App, Frame};
-use rfd::FileDialog;
 use app_state::GeneratorAppState;
+use eframe::{App, Frame, egui};
+use rfd::FileDialog;
 use std::io::Write;
 
 impl App for GeneratorAppState {
@@ -265,20 +265,28 @@ fn main() -> eframe::Result<()> {
     let default_panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
         eprintln!("Generator GUI Panicked: {:?}", panic_info);
-        let log_message = format!("PANIC: {:?}\nTimestamp: {}\n", panic_info, chrono::Local::now().to_rfc3339());
+        let log_message = format!(
+            "PANIC: {:?}\nTimestamp: {}\n",
+            panic_info,
+            chrono::Local::now().to_rfc3339()
+        );
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
                 let panic_log_path = exe_dir.join("generator_gui_panic.log");
-                if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(panic_log_path) {
+                if let Ok(mut file) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(panic_log_path)
+                {
                     let _ = writeln!(file, "{}", log_message);
                 } else {
-                     eprintln!("Failed to open/create panic log file for generator GUI.");
+                    eprintln!("Failed to open/create panic log file for generator GUI.");
                 }
             } else {
                 eprintln!("Failed to get executable directory for generator GUI panic log.");
             }
         } else {
-             eprintln!("Failed to get current executable path for generator GUI panic log.");
+            eprintln!("Failed to get current executable path for generator GUI panic log.");
         }
         default_panic_hook(panic_info);
     }));

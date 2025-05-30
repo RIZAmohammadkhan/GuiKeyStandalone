@@ -1,8 +1,8 @@
 // src/p2p/protocol.rs
 
 use async_trait::async_trait;
-use futures::{prelude::*, AsyncRead, AsyncWrite};
-use libp2p::request_response::{self, OutboundRequestId, InboundRequestId};
+use futures::{AsyncRead, AsyncWrite, prelude::*};
+use libp2p::request_response::{self, InboundRequestId, OutboundRequestId};
 use serde::{Deserialize, Serialize};
 use std::io;
 
@@ -14,7 +14,8 @@ pub const LOG_SYNC_PROTOCOL_NAME_STR: &str = "/guikey_standalone/log_sync/1.0.0"
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct LogSyncProtocol();
 
-impl AsRef<str> for LogSyncProtocol { // Changed back to AsRef<str>
+impl AsRef<str> for LogSyncProtocol {
+    // Changed back to AsRef<str>
     fn as_ref(&self) -> &str {
         LOG_SYNC_PROTOCOL_NAME_STR
     }
@@ -45,7 +46,11 @@ impl request_response::Codec for LogSyncCodec {
     type Request = LogBatchRequest;
     type Response = LogBatchResponse;
 
-    async fn read_request<T>(&mut self, _protocol: &Self::Protocol, io: &mut T) -> io::Result<Self::Request>
+    async fn read_request<T>(
+        &mut self,
+        _protocol: &Self::Protocol,
+        io: &mut T,
+    ) -> io::Result<Self::Request>
     where
         T: AsyncRead + Unpin + Send,
     {
@@ -54,18 +59,24 @@ impl request_response::Codec for LogSyncCodec {
         io.read_exact(&mut len_bytes).await?;
         let len = u32::from_be_bytes(len_bytes) as usize;
 
-        if len > 10 * 1024 * 1024 { 
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Request too large"));
+        if len > 10 * 1024 * 1024 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Request too large",
+            ));
         }
 
         let mut buffer = vec![0u8; len];
         io.read_exact(&mut buffer).await?;
 
-        serde_json::from_slice(&buffer)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        serde_json::from_slice(&buffer).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
-    async fn read_response<T>(&mut self, _protocol: &Self::Protocol, io: &mut T) -> io::Result<Self::Response>
+    async fn read_response<T>(
+        &mut self,
+        _protocol: &Self::Protocol,
+        io: &mut T,
+    ) -> io::Result<Self::Response>
     where
         T: AsyncRead + Unpin + Send,
     {
@@ -74,15 +85,17 @@ impl request_response::Codec for LogSyncCodec {
         io.read_exact(&mut len_bytes).await?;
         let len = u32::from_be_bytes(len_bytes) as usize;
 
-        if len > 1 * 1024 * 1024 { 
-             return Err(io::Error::new(io::ErrorKind::InvalidData, "Response too large"));
+        if len > 1 * 1024 * 1024 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Response too large",
+            ));
         }
 
         let mut buffer = vec![0u8; len];
         io.read_exact(&mut buffer).await?;
 
-        serde_json::from_slice(&buffer)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        serde_json::from_slice(&buffer).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     async fn write_request<T>(
@@ -95,8 +108,8 @@ impl request_response::Codec for LogSyncCodec {
         T: AsyncWrite + Unpin + Send,
     {
         // tracing::trace!("Writing request with protocol: {}", protocol.as_ref());
-        let buffer = serde_json::to_vec(&req)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let buffer =
+            serde_json::to_vec(&req).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         let len = buffer.len() as u32;
         io.write_all(&len.to_be_bytes()).await?;
@@ -115,8 +128,8 @@ impl request_response::Codec for LogSyncCodec {
         T: AsyncWrite + Unpin + Send,
     {
         // tracing::trace!("Writing response with protocol: {}", protocol.as_ref());
-        let buffer = serde_json::to_vec(&res)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let buffer =
+            serde_json::to_vec(&res).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         let len = buffer.len() as u32;
         io.write_all(&len.to_be_bytes()).await?;

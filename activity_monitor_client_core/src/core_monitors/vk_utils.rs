@@ -1,35 +1,28 @@
-use windows_sys::Win32::UI::WindowsAndMessaging::LLKHF_UP;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyboardState, ToUnicode,
-    VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2,
-    VK_BACK, VK_TAB, VK_CLEAR, VK_RETURN, VK_SHIFT, VK_LSHIFT, VK_RSHIFT,
-    VK_CONTROL, VK_LCONTROL, VK_RCONTROL, VK_MENU, VK_LMENU, VK_RMENU,
-    VK_PAUSE, VK_CAPITAL, VK_KANA, VK_HANGEUL, VK_HANGUL, VK_JUNJA, VK_FINAL,
-    VK_HANJA, VK_KANJI, VK_ESCAPE, VK_CONVERT, VK_NONCONVERT, VK_ACCEPT,
-    VK_MODECHANGE, VK_SPACE, VK_PRIOR, VK_NEXT, VK_END, VK_HOME, VK_LEFT,
-    VK_UP, VK_RIGHT, VK_DOWN, VK_SELECT, VK_PRINT, VK_EXECUTE, VK_SNAPSHOT,
-    VK_INSERT, VK_DELETE, VK_HELP, VK_LWIN, VK_RWIN, VK_APPS, VK_SLEEP,
-    VK_NUMPAD0, VK_NUMPAD1, VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD4, VK_NUMPAD5,
-    VK_NUMPAD6, VK_NUMPAD7, VK_NUMPAD8, VK_NUMPAD9,
-    VK_MULTIPLY, VK_ADD, VK_SEPARATOR, VK_SUBTRACT, VK_DECIMAL, VK_DIVIDE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10,
-    VK_F11, VK_F12, VK_F13, VK_F14, VK_F15, VK_F16, VK_F17, VK_F18, VK_F19,
-    VK_F20, VK_F21, VK_F22, VK_F23, VK_F24,
-    VK_NUMLOCK, VK_SCROLL,
-    VK_BROWSER_BACK, VK_BROWSER_FORWARD, VK_BROWSER_REFRESH, VK_BROWSER_STOP,
-    VK_BROWSER_SEARCH, VK_BROWSER_FAVORITES, VK_BROWSER_HOME,
-    VK_VOLUME_MUTE, VK_VOLUME_DOWN, VK_VOLUME_UP,
-    VK_MEDIA_NEXT_TRACK, VK_MEDIA_PREV_TRACK, VK_MEDIA_STOP, VK_MEDIA_PLAY_PAUSE,
-    VK_LAUNCH_MAIL, VK_LAUNCH_MEDIA_SELECT, VK_LAUNCH_APP1, VK_LAUNCH_APP2,
+    GetKeyboardState, ToUnicode, VK_ACCEPT, VK_ADD, VK_APPS, VK_BACK, VK_BROWSER_BACK,
+    VK_BROWSER_FAVORITES, VK_BROWSER_FORWARD, VK_BROWSER_HOME, VK_BROWSER_REFRESH,
+    VK_BROWSER_SEARCH, VK_BROWSER_STOP, VK_CAPITAL, VK_CLEAR, VK_CONTROL, VK_CONVERT, VK_DECIMAL,
+    VK_DELETE, VK_DIVIDE, VK_DOWN, VK_END, VK_ESCAPE, VK_EXECUTE, VK_F1, VK_F2, VK_F3, VK_F4,
+    VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_F13, VK_F14, VK_F15, VK_F16,
+    VK_F17, VK_F18, VK_F19, VK_F20, VK_F21, VK_F22, VK_F23, VK_F24, VK_FINAL, VK_HANGEUL,
+    VK_HANGUL, VK_HANJA, VK_HELP, VK_HOME, VK_INSERT, VK_JUNJA, VK_KANA, VK_KANJI, VK_LAUNCH_APP1,
+    VK_LAUNCH_APP2, VK_LAUNCH_MAIL, VK_LAUNCH_MEDIA_SELECT, VK_LBUTTON, VK_LCONTROL, VK_LEFT,
+    VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MBUTTON, VK_MEDIA_NEXT_TRACK, VK_MEDIA_PLAY_PAUSE,
+    VK_MEDIA_PREV_TRACK, VK_MEDIA_STOP, VK_MENU, VK_MODECHANGE, VK_MULTIPLY, VK_NEXT,
+    VK_NONCONVERT, VK_NUMLOCK, VK_NUMPAD0, VK_NUMPAD1, VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD4,
+    VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7, VK_NUMPAD8, VK_NUMPAD9, VK_PAUSE, VK_PRINT, VK_PRIOR,
+    VK_RBUTTON, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SCROLL,
+    VK_SELECT, VK_SEPARATOR, VK_SHIFT, VK_SLEEP, VK_SNAPSHOT, VK_SPACE, VK_SUBTRACT, VK_TAB, VK_UP,
+    VK_VOLUME_DOWN, VK_VOLUME_MUTE, VK_VOLUME_UP, VK_XBUTTON1, VK_XBUTTON2,
 };
+use windows_sys::Win32::UI::WindowsAndMessaging::LLKHF_UP;
 // use windows_sys::Win32::UI::WindowsAndMessaging::LLKHF_UP;
-
 
 pub fn vk_code_to_string(vk_code_u16: u16, scan_code: u32, flags: u32) -> (String, bool) {
     let mut is_char = false;
     let mut buffer: [u16; 8] = [0; 8];
     let mut keyboard_state: [u8; 256] = [0; 256];
-    
+
     // Check if LLKHF_UP is set in flags. LLKHF_UP should be u32.
     let _is_key_up = flags & LLKHF_UP == LLKHF_UP;
     let to_unicode_flags = 0u32; // For ToUnicode, 0 is often sufficient.
@@ -55,15 +48,25 @@ pub fn vk_code_to_string(vk_code_u16: u16, scan_code: u32, flags: u32) -> (Strin
         if result > 0 {
             is_char = true;
             let char_count = result as usize;
-            let end = buffer.iter().take(char_count).position(|&c| c == 0).unwrap_or(char_count);
+            let end = buffer
+                .iter()
+                .take(char_count)
+                .position(|&c| c == 0)
+                .unwrap_or(char_count);
             String::from_utf16_lossy(&buffer[..end])
-        } else if result == 0 { // No translation
+        } else if result == 0 {
+            // No translation
             is_char = false;
             simple_vk_map(vk_code_u16).0
-        } else { // result < 0, dead key. abs(result) is number of chars.
+        } else {
+            // result < 0, dead key. abs(result) is number of chars.
             is_char = true; // Treat as a character for logging purposes
             let char_count = result.abs() as usize;
-            let end = buffer.iter().take(char_count).position(|&c| c == 0).unwrap_or(char_count);
+            let end = buffer
+                .iter()
+                .take(char_count)
+                .position(|&c| c == 0)
+                .unwrap_or(char_count);
             String::from_utf16_lossy(&buffer[..end]) // This will be the dead key char like ` or ~
         }
     };
@@ -97,7 +100,9 @@ fn simple_vk_map(vk_code: u16) -> (String, bool) {
         c if c == VK_RMENU as i32 => "[RALT]".to_string(),
         c if c == VK_PAUSE as i32 => "[PAUSE]".to_string(),
         c if c == VK_CAPITAL as i32 => "[CAPSLOCK]".to_string(),
-        c if c == VK_KANA as i32 || c == VK_HANGEUL as i32 || c == VK_HANGUL as i32 => "[KANA/HANGUL]".to_string(),
+        c if c == VK_KANA as i32 || c == VK_HANGEUL as i32 || c == VK_HANGUL as i32 => {
+            "[KANA/HANGUL]".to_string()
+        }
         c if c == VK_JUNJA as i32 => "[JUNJA]".to_string(),
         c if c == VK_FINAL as i32 => "[FINAL]".to_string(),
         c if c == VK_HANJA as i32 || c == VK_KANJI as i32 => "[HANJA/KANJI]".to_string(),
@@ -106,7 +111,10 @@ fn simple_vk_map(vk_code: u16) -> (String, bool) {
         c if c == VK_NONCONVERT as i32 => "[NONCONVERT]".to_string(),
         c if c == VK_ACCEPT as i32 => "[ACCEPT]".to_string(),
         c if c == VK_MODECHANGE as i32 => "[MODECHANGE]".to_string(),
-        c if c == VK_SPACE as i32 => { is_char = true; " ".to_string() },
+        c if c == VK_SPACE as i32 => {
+            is_char = true;
+            " ".to_string()
+        }
         c if c == VK_PRIOR as i32 => "[PAGE_UP]".to_string(),
         c if c == VK_NEXT as i32 => "[PAGE_DOWN]".to_string(),
         c if c == VK_END as i32 => "[END]".to_string(),
@@ -126,14 +134,18 @@ fn simple_vk_map(vk_code: u16) -> (String, bool) {
         c if c == VK_RWIN as i32 => "[RWINKEY]".to_string(),
         c if c == VK_APPS as i32 => "[APP_MENU]".to_string(),
         c if c == VK_SLEEP as i32 => "[SLEEP]".to_string(),
-        c if c >= (VK_NUMPAD0 as i32) && c <= (VK_NUMPAD9 as i32) => format!("[NUMPAD_{}]", c - (VK_NUMPAD0 as i32)),
+        c if c >= (VK_NUMPAD0 as i32) && c <= (VK_NUMPAD9 as i32) => {
+            format!("[NUMPAD_{}]", c - (VK_NUMPAD0 as i32))
+        }
         c if c == VK_MULTIPLY as i32 => "[NUMPAD_*]".to_string(),
         c if c == VK_ADD as i32 => "[NUMPAD_+]".to_string(),
         c if c == VK_SEPARATOR as i32 => "[NUMPAD_SEPARATOR]".to_string(),
         c if c == VK_SUBTRACT as i32 => "[NUMPAD_-]".to_string(),
         c if c == VK_DECIMAL as i32 => "[NUMPAD_.]".to_string(),
         c if c == VK_DIVIDE as i32 => "[NUMPAD_/]".to_string(),
-        c if c >= (VK_F1 as i32) && c <= (VK_F24 as i32) => format!("[F{}]", c - (VK_F1 as i32) + 1),
+        c if c >= (VK_F1 as i32) && c <= (VK_F24 as i32) => {
+            format!("[F{}]", c - (VK_F1 as i32) + 1)
+        }
         c if c == VK_NUMLOCK as i32 => "[NUMLOCK]".to_string(),
         c if c == VK_SCROLL as i32 => "[SCROLLLOCK]".to_string(),
         c if c == VK_BROWSER_BACK as i32 => "[BROWSER_BACK]".to_string(),

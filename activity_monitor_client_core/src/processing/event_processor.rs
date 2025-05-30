@@ -1,16 +1,16 @@
 // src/processing/event_processor.rs
 
 use crate::app_config::Settings;
-use crate::event_types::{LogEvent, EventData, ClipboardActivity}; // Assuming these are in crate::event_types
-use crate::storage::log_store::LogStoreHandle; // Assuming this is in crate::storage::log_store
-use crate::core_monitors::keyboard_capture::RawKeyboardData;
 use crate::core_monitors::clipboard_capture::RawClipboardData;
+use crate::core_monitors::keyboard_capture::RawKeyboardData;
 use crate::errors::AppError; // Assuming this is in crate::errors
-use tokio::sync::mpsc;
-use tokio::time::{interval, Interval, Duration, MissedTickBehavior};
-use std::sync::Arc;
+use crate::event_types::{ClipboardActivity, EventData, LogEvent}; // Assuming these are in crate::event_types
+use crate::storage::log_store::LogStoreHandle; // Assuming this is in crate::storage::log_store
 use chrono::{DateTime, Utc};
-use sha2::{Sha256, Digest}; // For hashing clipboard content
+use sha2::{Digest, Sha256};
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::time::{Duration, Interval, MissedTickBehavior, interval}; // For hashing clipboard content
 
 struct CurrentSession {
     application_name: String,
@@ -52,20 +52,23 @@ pub async fn run_event_processor(
 
     let mut current_session: Option<CurrentSession> = None;
 
-    let mut periodic_flush_interval_opt: Option<Interval> = if settings.processor_periodic_flush_interval_secs > 0 {
-        let mut intv = interval(Duration::from_secs(settings.processor_periodic_flush_interval_secs));
-        intv.set_missed_tick_behavior(MissedTickBehavior::Delay);
-        Some(intv)
-    } else {
-        None
-    };
+    let mut periodic_flush_interval_opt: Option<Interval> =
+        if settings.processor_periodic_flush_interval_secs > 0 {
+            let mut intv = interval(Duration::from_secs(
+                settings.processor_periodic_flush_interval_secs,
+            ));
+            intv.set_missed_tick_behavior(MissedTickBehavior::Delay);
+            Some(intv)
+        } else {
+            None
+        };
 
     loop {
         let tick_future = async {
             if let Some(ref mut interval) = periodic_flush_interval_opt.as_mut() {
                 if current_session.is_some() {
                     interval.tick().await;
-                    return Some(()); 
+                    return Some(());
                 }
             }
             std::future::pending().await // Pend if no interval or no session
@@ -82,7 +85,7 @@ pub async fn run_event_processor(
                             finalize_and_store_session(session, Utc::now(), &settings, &log_store).await;
                         }
                     }
-                    break; 
+                    break;
                 }
             }
 
@@ -184,7 +187,10 @@ async fn finalize_and_store_session(
     log_store: &LogStoreHandle,
 ) {
     if session.is_empty() {
-        tracing::trace!("Event processor: Skipping storage of empty session for app: {}", session.application_name);
+        tracing::trace!(
+            "Event processor: Skipping storage of empty session for app: {}",
+            session.application_name
+        );
         return;
     }
 
@@ -209,6 +215,9 @@ async fn finalize_and_store_session(
     );
 
     if let Err(e) = log_store.add_event(log_event).await {
-        tracing::error!("Event processor: Failed to store finalized session event: {}", e);
+        tracing::error!(
+            "Event processor: Failed to store finalized session event: {}",
+            e
+        );
     }
 }

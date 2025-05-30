@@ -93,7 +93,10 @@ impl Settings {
                     config_builder.add_source(ConfigFile::from(path_to_try.clone()).required(true));
                 loaded_from_file = true;
                 // Use tracing here once it's initialized, or println for early config phase
-                println!("[INFO] Client: Loading configuration from: {:?}", path_to_try);
+                println!(
+                    "[INFO] Client: Loading configuration from: {:?}",
+                    path_to_try
+                );
                 break;
             }
         }
@@ -114,13 +117,11 @@ impl Settings {
             .build()
             .map_err(|e| AppError::Config(format!("Failed to build configuration: {}", e)))?
             .try_deserialize()
-            .map_err(|e| {
-                AppError::Config(format!("Failed to deserialize configuration: {}", e))
-            })?;
+            .map_err(|e| AppError::Config(format!("Failed to deserialize configuration: {}", e)))?;
 
         // Process app-level encryption key
-        let key_bytes = hex::decode(&raw_settings.encryption_key_hex)
-            .map_err(AppError::HexDecode)?;
+        let key_bytes =
+            hex::decode(&raw_settings.encryption_key_hex).map_err(AppError::HexDecode)?;
         if key_bytes.len() != 32 {
             return Err(AppError::Config(
                 "App-level encryption key must be 32 bytes (64 hex characters).".to_string(),
@@ -154,13 +155,16 @@ impl Settings {
         if bootstrap_addresses.is_empty() {
             // This might be an error condition depending on your discovery strategy
             // For now, just a warning. Kademlia might still work if it can find other peers.
-            println!("[WARN] Client: No valid bootstrap addresses configured. P2P discovery might be impaired.");
+            println!(
+                "[WARN] Client: No valid bootstrap addresses configured. P2P discovery might be impaired."
+            );
         }
 
-
         // Determine client_id_file_path (for app-level client_id)
-        let client_id_file_path = raw_settings.client_id_file.as_ref().map(|s| exe_dir.join(s));
-
+        let client_id_file_path = raw_settings
+            .client_id_file
+            .as_ref()
+            .map(|s| exe_dir.join(s));
 
         // Load or generate app-level client_id
         let client_id_uuid = if let Some(id_str) = raw_settings.client_id {
@@ -208,7 +212,10 @@ fn load_or_generate_client_id(path_opt: Option<&Path>) -> Result<Uuid, AppError>
     }
 
     let new_id = Uuid::new_v4();
-    println!("[INFO] Client: Generated new app-level client_id: {}", new_id); // Use tracing once logger is up
+    println!(
+        "[INFO] Client: Generated new app-level client_id: {}",
+        new_id
+    ); // Use tracing once logger is up
 
     if let Some(p) = path_opt {
         if let Some(parent_dir) = p.parent() {
@@ -217,7 +224,10 @@ fn load_or_generate_client_id(path_opt: Option<&Path>) -> Result<Uuid, AppError>
         std::fs::write(p, new_id.to_string()).map_err(AppError::Io)?;
         println!("[INFO] Client: Saved new app-level client_id to {:?}", p);
     } else {
-        println!("[INFO] Client: Using new app-level client_id for this session (no client_id_file configured): {}", new_id);
+        println!(
+            "[INFO] Client: Using new app-level client_id for this session (no client_id_file configured): {}",
+            new_id
+        );
     }
     Ok(new_id)
 }

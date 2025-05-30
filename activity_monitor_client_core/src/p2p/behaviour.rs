@@ -1,40 +1,35 @@
 // src/p2p/behaviour.rs
 
 use libp2p::{
+    PeerId,
+    // StreamProtocol, // Not strictly needed if kad::PROTOCOL_NAME is directly compatible
     autonat,
     dcutr, // Keep this for dcutr::Behaviour and dcutr::Event later
     identify,
     kad::{self, Config as KademliaConfig, store::MemoryStore}, // KademliaProtocolName not needed if using default
-    request_response,
     relay::client::{
         self as relay_client_module, // Alias the module
         Behaviour as RelayClientBehaviour,
         // Event is handled in ClientBehaviourEvent
         // Transport is handled by SwarmBuilder now
     },
+    request_response,
     swarm::NetworkBehaviour,
-    PeerId,
-    // StreamProtocol, // Not strictly needed if kad::PROTOCOL_NAME is directly compatible
 };
-use tokio::time::Duration;
 use std::iter;
+use tokio::time::Duration;
 
-use super::protocol::{
-    LogSyncCodec,
-    LogBatchRequest,
-    LogBatchResponse,
-    LogSyncProtocol,
-};
+use super::protocol::{LogBatchRequest, LogBatchResponse, LogSyncCodec, LogSyncProtocol};
 
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "ClientBehaviourEvent")]
 pub struct ClientBehaviour {
     pub request_response: request_response::Behaviour<LogSyncCodec>,
-    pub kademlia:         kad::Behaviour<MemoryStore>,
-    pub identify:         identify::Behaviour,
-    pub relay_client:     RelayClientBehaviour,
-    pub dcutr:            dcutr::Behaviour, // This is libp2p::dcutr::Behaviour
-    pub autonat:          autonat::Behaviour, // This is libp2p::autonat::Behaviour
+    pub kademlia: kad::Behaviour<MemoryStore>,
+    pub identify: identify::Behaviour,
+    pub relay_client: RelayClientBehaviour,
+    pub dcutr: dcutr::Behaviour,     // This is libp2p::dcutr::Behaviour
+    pub autonat: autonat::Behaviour, // This is libp2p::autonat::Behaviour
 }
 
 #[derive(Debug)]
@@ -43,28 +38,41 @@ pub enum ClientBehaviourEvent {
     Kademlia(kad::Event),
     Identify(identify::Event),
     RelayClient(relay_client_module::Event), // Use aliased module for event
-    Dcutr(libp2p::dcutr::Event),       // Use full path
-    Autonat(libp2p::autonat::Event),   // Use full path
+    Dcutr(libp2p::dcutr::Event),             // Use full path
+    Autonat(libp2p::autonat::Event),         // Use full path
 }
 
 // --- From implementations ---
 impl From<request_response::Event<LogBatchRequest, LogBatchResponse>> for ClientBehaviourEvent {
-    fn from(e: request_response::Event<LogBatchRequest, LogBatchResponse>) -> Self { ClientBehaviourEvent::RequestResponse(e) }
+    fn from(e: request_response::Event<LogBatchRequest, LogBatchResponse>) -> Self {
+        ClientBehaviourEvent::RequestResponse(e)
+    }
 }
 impl From<kad::Event> for ClientBehaviourEvent {
-    fn from(e: kad::Event) -> Self { ClientBehaviourEvent::Kademlia(e) }
+    fn from(e: kad::Event) -> Self {
+        ClientBehaviourEvent::Kademlia(e)
+    }
 }
 impl From<identify::Event> for ClientBehaviourEvent {
-    fn from(e: identify::Event) -> Self { ClientBehaviourEvent::Identify(e) }
+    fn from(e: identify::Event) -> Self {
+        ClientBehaviourEvent::Identify(e)
+    }
 }
-impl From<relay_client_module::Event> for ClientBehaviourEvent { // Use aliased module
-    fn from(e: relay_client_module::Event) -> Self { ClientBehaviourEvent::RelayClient(e) }
+impl From<relay_client_module::Event> for ClientBehaviourEvent {
+    // Use aliased module
+    fn from(e: relay_client_module::Event) -> Self {
+        ClientBehaviourEvent::RelayClient(e)
+    }
 }
 impl From<libp2p::dcutr::Event> for ClientBehaviourEvent {
-    fn from(e: libp2p::dcutr::Event) -> Self { ClientBehaviourEvent::Dcutr(e) }
+    fn from(e: libp2p::dcutr::Event) -> Self {
+        ClientBehaviourEvent::Dcutr(e)
+    }
 }
 impl From<libp2p::autonat::Event> for ClientBehaviourEvent {
-    fn from(e: libp2p::autonat::Event) -> Self { ClientBehaviourEvent::Autonat(e) }
+    fn from(e: libp2p::autonat::Event) -> Self {
+        ClientBehaviourEvent::Autonat(e)
+    }
 }
 
 impl ClientBehaviour {
@@ -87,8 +95,8 @@ impl ClientBehaviour {
             LogSyncProtocol::default(),
             request_response::ProtocolSupport::Full,
         ));
-        let rr_cfg = request_response::Config::default()
-            .with_request_timeout(Duration::from_secs(45));
+        let rr_cfg =
+            request_response::Config::default().with_request_timeout(Duration::from_secs(45));
         let request_response =
             request_response::Behaviour::<LogSyncCodec>::new(rr_protocols, rr_cfg);
 
@@ -100,7 +108,7 @@ impl ClientBehaviour {
 
         // AutoNAT
         let autonat_cfg = autonat::Config {
-            boot_delay:     Duration::from_secs(15),
+            boot_delay: Duration::from_secs(15),
             retry_interval: Duration::from_secs(60),
             ..Default::default()
         };

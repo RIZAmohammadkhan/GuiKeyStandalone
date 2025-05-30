@@ -19,7 +19,10 @@ pub struct P2pDataSender {
 
 impl P2pDataSender {
     pub fn new(settings: Arc<Settings>, command_tx: mpsc::Sender<SwarmCommand>) -> Self {
-        Self { settings, command_tx }
+        Self {
+            settings,
+            command_tx,
+        }
     }
 
     pub async fn send_log_batch(
@@ -47,8 +50,11 @@ impl P2pDataSender {
         };
 
         if self.command_tx.send(command).await.is_err() {
-            tracing::error!("P2pDataSender: Failed to send command to SwarmManager. Channel closed.");
-            return Err(AppError::Internal( // Changed to Internal
+            tracing::error!(
+                "P2pDataSender: Failed to send command to SwarmManager. Channel closed."
+            );
+            return Err(AppError::Internal(
+                // Changed to Internal
                 "P2P command channel closed".to_string(),
             ));
         }
@@ -57,7 +63,9 @@ impl P2pDataSender {
             Ok(Ok(Ok(response))) => {
                 tracing::info!(
                     "P2pDataSender: Successfully sent batch. Server response: status='{}', msg='{}', processed={}",
-                    response.status, response.message, response.events_processed
+                    response.status,
+                    response.message,
+                    response.events_processed
                 );
                 Ok(response)
             }
@@ -67,7 +75,8 @@ impl P2pDataSender {
             }
             Ok(Err(_oneshot_cancelled_err)) => {
                 tracing::error!("P2pDataSender: P2P response channel cancelled by SwarmManager.");
-                Err(AppError::Internal( // Changed to Internal
+                Err(AppError::Internal(
+                    // Changed to Internal
                     "P2P response channel cancelled".to_string(),
                 ))
             }
