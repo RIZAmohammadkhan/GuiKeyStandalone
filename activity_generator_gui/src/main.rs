@@ -20,7 +20,7 @@ impl App for GeneratorAppState {
             ui.add_space(6.0);
             ui.label("This tool generates a client package for remote P2P deployment and a server package for the operator.");
             ui.label("The necessary template binaries and server assets are embedded within this generator.");
-            ui.hyperlink_to("View Setup & Usage Instructions Online", "https://github.com/RIZAmohammadkhan/GuiKeyStandalone/blob/main/docs/GENERATOR_GUIDE.md");
+            ui.hyperlink_to("View Setup & Usage Instructions Online", "https://github.com/RIZAmohammadkhan/GuiKeyStandalone/activity_generator_gui/GENERATOR_GUIDE.md");
             ui.add_space(10.0);
 
             egui::ScrollArea::vertical()
