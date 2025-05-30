@@ -16,6 +16,7 @@ fs_extra = "1.3.0"
 thiserror = "1.0.57"
 chrono = "0.4.33" # For timestamp in panic log
 include_dir = "0.7"
+libp2p-identity = { version = "0.2.11", features = ["peerid", "ed25519"] }
 
 [build-dependencies]
 # embed-resource = "1.7"

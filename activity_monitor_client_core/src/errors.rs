@@ -1,3 +1,4 @@
+// src/errors.rs
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -8,12 +9,14 @@ pub enum AppError {
     Io(#[from] std::io::Error),
     #[error("Serialization error (JSON): {0}")]
     SerializationJson(#[from] serde_json::Error),
-    #[error("Network error: {0}")]
-    Network(#[from] reqwest::Error),
+    // #[error("Network error: {0}")] // This was for reqwest
+    // Network(#[from] reqwest::Error), // Removing reqwest::Error
+    #[error("P2P Network operation error: {0}")] // New generic P2P error
+    P2pOperation(String),
     #[error("Encryption error: {0}")]
     Encryption(String),
     #[error("Decryption error: {0}")]
-    Decryption(String), // Though client mostly encrypts
+    Decryption(String),
     #[error("Windows API error: {context} (Code: {code})")]
     WinApi { context: String, code: u32 },
     #[error("Data storage error: {0}")]
@@ -32,6 +35,8 @@ pub enum AppError {
     HexDecode(#[from] hex::FromHexError),
     #[error("Initialization failed: {0}")]
     Initialization(String),
+    #[error("Internal application error: {0}")] // Added for general internal issues
+    Internal(String),
     #[error("An unexpected error occurred: {0}")]
     Unknown(String),
 }

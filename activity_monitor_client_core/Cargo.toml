@@ -6,16 +6,16 @@ edition = "2024"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1.7.0", features = ["v4", "serde"] } # Ensure consistent version
+uuid = { version = "1.7.0", features = ["v4", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 config = { version = "0.13", features = ["toml"] }
 thiserror = "1.0"
 tracing = "0.1"
-async-stream = "0.3" # ADDED for log_store periodic cleanup timer
+async-stream = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-tracing-appender = "0.2" # For file logging
-windows-sys = { version = "0.52.0", features = [ # Using a specific stable version
+tracing-appender = "0.2"
+windows-sys = { version = "0.52.0", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Input_KeyboardAndMouse",
@@ -27,17 +27,20 @@ windows-sys = { version = "0.52.0", features = [ # Using a specific stable versi
     "Win32_System_LibraryLoader",
     "Win32_System_DataExchange",
     "Win32_System_Memory",
-    "Win32_Graphics_Gdi", # For WNDCLASSW if used (clipboard listener window)
-    "Win32_System_Ole",   # For CF_UNICODETEXT
+    "Win32_Graphics_Gdi",
+    "Win32_System_Ole",
 ]}
-winreg = "0.52" # Easier registry access
+winreg = "0.52"
 aes-gcm = "0.10"
-rand = "0.8" # For nonce generation
-hex = "0.4.3"  # Ensure consistent version
-sha2 = "0.10" # For SHA256 hashing
-reqwest = { version = "0.12.2", features = ["json", "rustls-tls"], default-features = false } # Ensure consistent version
-futures = "0.3" # For select_all in main.rs if still used, or other future utilities
+rand = "0.8"
+hex = "0.4.3"
+sha2 = "0.10" # <--- ADDED THIS
+futures = "0.3"
 tempfile = "3.8"
+async-trait = "0.1"
+
+# --- libp2p dependencies ---
+libp2p = { version = "0.55",features = ["tokio", "tls" ,"macros", "mdns", "kad", "identify", "request-response", "relay", "dcutr", "noise", "yamux","tcp", "dns", "autonat"]}
 
 [build-dependencies]
-embed-manifest = "1.4.0" # Ensure consistent version
+embed-manifest = "1.4.0"
